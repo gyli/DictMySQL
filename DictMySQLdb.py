@@ -5,7 +5,7 @@ import MySQLdb
 # import chardet
 
 
-class DB:
+class DictMySQLdb:
     def __init__(self, host, user, passwd, db, port=3306, charset='utf8', init_command='SET NAMES UTF8'):
         self.host = host
         self.port = int(port)
@@ -65,6 +65,18 @@ class DB:
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
+
+    def insertmany(self, tablename, field, value, commit=True):
+        """
+        :param value: [(value_1, value_2,), ]
+        """
+        if type(value) is not list:
+            raise TypeError('Input value should be a list')
+
+        _sql = 'INSERT INTO ' + tablename + ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s'] * len(field)) + ')'
+        self.cur.executemany(_sql, value)
+        if commit:
+            self.conn.commit()
 
     def upsert(self, tablename, value, commit=True):
         if type(value) is not dict:

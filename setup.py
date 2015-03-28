@@ -10,17 +10,17 @@ setup(
     name='mysqltool',
 
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.4',
+    version='0.1.6',
 
-    description='A mysql package for database manipulation.',
+    description='A mysql package above MySQL-python for more convenient database manipulation with Python dictionary.',
 
     # url='https://github.com/pypa/sampleproject',
 
     # Author details
     author='Guangyang Li',
-    author_email='mail@guangyang.li',
+    author_email='mail@guangyangli.com',
     license='MIT',
-    py_modules=['DB'],
+    py_modules=['DictMySQLdb'],
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         # How mature is this project? Common values are
