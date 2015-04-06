@@ -18,7 +18,14 @@ class DictMySQLdb:
                                     charset=charset, init_command=init_command)
         self.cur = self.conn.cursor()
 
-    # Still using self.cur.execute due to eascape reason
+    def reconnect(self):
+        try:
+            self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
+                                        charset=self.charset, init_command=self.init_command)
+            return True
+        except Exception:
+            return False
+
     def sql(self, sql, args=None):
         try:
             n = self.cur.execute(sql, args)
@@ -29,7 +36,9 @@ class DictMySQLdb:
     @staticmethod
     def _backtick(value, join=True):
         """
+        :param value: str, list and dict are all accaptable.
         :param join: If join is True, return a string "`id`, `name`"; otherwise, return a list ['`id`', '`name`']
+        :return: string
         """
         if type(value) == str:
             value = [value]
@@ -39,14 +48,44 @@ class DictMySQLdb:
         return ', '.join(result) if join else result
 
     @classmethod
-    def _join_condition(cls, value, comma=False, placeholder='%s'):
+    def _join_values(cls, value, placeholder='%s'):
         """
-        :param comma: If comma is True, return "`id`=%s, `name`=%s"; otherwise, return "`id`=%s AND `name`=%s".
-                      When comma is False, it can be used in conditions and converts None value into 'IS NULL' in sql.
-                      Remember to filter the None when using value in execute()
+        Return "`id` = %s, `name` = %s". Only used in update(), no need to convert NULL values.
+        :return: string
         """
-        return ', '.join([' = '.join([cls._backtick(v), placeholder]) for v in value]) if comma else \
-            ' AND '.join([(cls._backtick(v) + ' IS NULL' if value[v] is None else ' = '.join([cls._backtick(v), placeholder])) for v in value])
+        return ', '.join([' = '.join([cls._backtick(v), placeholder]) for v in value])
+
+    @classmethod
+    def _join_condition(cls, value, placeholder='%s'):
+        """
+        Return "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
+        :return: string
+        """
+        condition = []
+        for v in value:
+            if hasattr(value[v], '__iter__'):
+                condition.append(cls._backtick(v) + ' IN (' + ', '.join([placeholder]*len(value[v])) + ')')
+            elif value[v] is None:
+                condition.append(cls._backtick(v) + ' IS NULL')
+            else:
+                condition.append(cls._backtick(v) + ' = ' + placeholder)
+        return ' AND '.join(condition)
+
+    @staticmethod
+    def _condition_filter(condition):
+        """
+        Filter the None values and convert iterable items to elements in the original list
+        :return: list
+        """
+        result = []
+        for v in condition:
+            if hasattr(condition[v], '__iter__'):
+                for item in condition[v]:
+                    result.append(item)
+            # still allow 0
+            elif condition[v] is not None:
+                result.append(condition[v])
+        return result
 
     def insert(self, tablename, value, ignore=False, commit=True):
         """
@@ -55,11 +94,12 @@ class DictMySQLdb:
         if type(value) is not dict:
             raise TypeError('Input value should be a dictionary')
 
+        # TODO: unicode for input value
         # for v in value:
-        #     value[v] = unicode(value[v], chardet.detect(value[v])['encoding']) if isinstance(value[v], str) else value[v]
+        # value[v] = unicode(value[v], chardet.detect(value[v])['encoding']) if isinstance(value[v], str) else value[v]
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(tablename),
-                        ' (', self._backtick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ')'])
+                        ' (', self._backtick(value), ') VALUES (', ', '.join(['%s']*len(value)), ')'])
 
         self.cur.execute(_sql, value.values())
         if commit:
@@ -73,7 +113,7 @@ class DictMySQLdb:
         if type(value) is not list:
             raise TypeError('Input value should be a list')
 
-        _sql = 'INSERT INTO ' + tablename + ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s'] * len(field)) + ')'
+        _sql = 'INSERT INTO ' + tablename + ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s']*len(field)) + ')'
         self.cur.executemany(_sql, value)
         if commit:
             self.conn.commit()
@@ -83,16 +123,16 @@ class DictMySQLdb:
             raise TypeError('Input value should be a dictionary')
 
         _sql = ''.join(['INSERT INTO ', self._backtick(tablename), ' (', self._backtick(value), ') VALUES ',
-                        '(', ', '.join(['%s'] * len(value)), ') ',
-                        'ON DUPLICATE KEY UPDATE ', ', '.join([k+'=VALUES(' + k + ')' for k in value.keys()])])
+                        '(', ', '.join(['%s']*len(value)), ') ',
+                        'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()])])
         self.cur.execute(_sql, value.values())
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def select(self, tablename, value=None, field=None, insert=False, limit=0, multi=True):
+    def select(self, tablename, condition=None, field=None, insert=False, limit=0, multi=True):
         """
-        :param value: The conditions of this query in a dict. value=None means no condition and returns everything.
+        :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
         :param field: Put the fields you want to select in a list, the default is id
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
         :param limit: The max row number you want to get from the query. Default is 0 which means no limit
@@ -102,56 +142,60 @@ class DictMySQLdb:
         if field is None:
             field = ['id']
 
-        if value is not None:
-            if type(value) is not dict:
+        if condition is not None:
+            if type(condition) is not dict:
                 raise TypeError('Input value should be a dictionary')
 
-            if all(v is None for v in value.values()):
+            if all(v is None for v in condition.values()):
                 return None
 
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
-                        '' if value is None else ''.join([' WHERE ', self._join_condition(value)]),
+                        '' if condition is None else ''.join([' WHERE ', self._join_condition(condition)]),
                         '' if limit == 0 else ''.join([' LIMIT ', str(limit)])])
-        if value is None:
+        if condition is None:
             self.cur.execute(_sql)
         else:
-            self.cur.execute(_sql, filter(None, value.values()))
+            result = self._condition_filter(condition)
+            self.cur.execute(_sql, result)
         ids = self.cur.fetchall()
-        return (self.insert(tablename=tablename, value=value) if insert else None) if ids == () else (
+        return (self.insert(tablename=tablename, value=condition) if insert else None) if ids == () else (
             tuple(i for i in (ids[0] if limit else ids)) if multi else ids[0][0])
 
-    def get(self, tablename, value, field='id', insert=True, ifnone=None):
+    def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
         A simplified method of select, for getting the first result from one field only
         :param ifnone: When ifnone is a non-empty string, raise an error if query return empty result. insert parameter
                        won't work in this mode.
         """
-        if all(v is None for v in value.values()):
+        if all(v is None for v in condition.values()):
             return None
 
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
-                        ' WHERE ', self._join_condition(value), ' LIMIT 1'])
+                        ' WHERE ', self._join_condition(condition), ' LIMIT 1'])
 
-        self.cur.execute(_sql, filter(None, value.values()))
+        result = self._condition_filter(condition)
+        self.cur.execute(_sql, result)
         ids = self.cur.fetchone()
         if ifnone is None:
-            return (self.insert(tablename=tablename, value=value) if insert else None) if ids is None else ids[0]
+            return (self.insert(tablename=tablename, value=condition) if insert else None) if ids is None else ids[0]
         else:
             if ids is None:
                 raise ValueError(ifnone)
             else:
                 return ids[0]
 
-    def update(self, tablename, condition, value, commit=True):
-        _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_condition(value, comma=True),
+    def update(self, tablename, value, condition, commit=True):
+        _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
-        self.cur.execute(_sql, (value.values() + filter(None, condition.values())))
+        result = self._condition_filter(condition)
+        self.cur.execute(_sql, (value.values() + result))
         if commit:
             self.commit()
 
     def delete(self, tablename, condition):
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._join_condition(condition)])
-        return self.cur.execute(_sql, filter(None, condition.values()))
+        result = self._condition_filter(condition)
+        return self.cur.execute(_sql, result)
 
     def now(self):
         self.cur.execute('SELECT NOW();')
