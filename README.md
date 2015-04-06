@@ -14,7 +14,7 @@ Besides of the methods MySQL-python offers, MySQLTool provides the following met
 * `delete()`
 * `now()`
 
-## Example
+## Examples
 
 Create connection:
 
@@ -22,27 +22,37 @@ Create connection:
 	
 Fetch one record:
 
-	db.get(tablename='raw_occupations', condition={'id': 2}, field='value')
+	db.get(tablename='jobs', condition={'id': 2}, field='value')
 	# u'FACULTY'
+	# SELECT `value` FROM `jobs` WHERE `id` = 2 LIMIT 1
 
 Pass multiple conditions:
-
-	db.select(tablename='raw_occupations', condition={'id': (2, 3), 'sanitized': 'no'}, field=['id','value'])
+				  
+	db.select(tablename='jobs', 
+			  condition={'id': (2, 3), 'sanitized': None},
+			  field=['id','value'])
 	# ((2, u'FACULTY'), (3, u'AUTOMOTIVE MECHANIC'))
+	# SELECT `id`, `value` FROM `jobs` WHERE `id` IN (2, 3) AND `sanitized` IS NULL
 
 Insert one record:
 	
-	db.insert(tablename='raw_occupations', value={'value': 'MANAGER'})
+	db.insert(tablename='jobs', value={'value': 'MANAGER'})
+	# INSERT INTO `jobs` (`value`) VALUES ('MANAGER')
 
 Insert multiple records:
 	
-	db.insertmany(tablename='raw_occupations', field=['id', 'value'], value=(['5', 'TEACHER'], ['6', 'MANAGER']))
+	db.insertmany(tablename='jobs', 
+	              field=['id', 'value'], 
+	              value=(['5', 'TEACHER'], ['6', 'MANAGER']))
+	# INSERT INTO `jobs` (`id`, `value`) VALUES (5, 'TEACHER'), (6, 'MANAGER')
 
 Upsert a record with a primary key in _value_:
 	
-	db.update(tablename='raw_occupations', value={'id': 3, 'value': 'MECHANIC'})
+	db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+	# INSERT INTO `jobs` (`id`, `value`) VALUES (3, 'MECHANIC') ON DUPLICATE KEY UPDATE id=VALUES(id), value=VALUES(value)
 
 Delete a record:
 
-	db.delete(tablename='raw_occupations', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': 'no'})
-	
+	db.delete(tablename='jobs', 
+	          condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None})
+	# DELETE FROM `jobs` WHERE `value` IN ('FACULTY', 'MECHANIC') AND `sanitized` IS NULL

@@ -64,7 +64,7 @@ class DictMySQLdb:
         condition = []
         for v in value:
             if hasattr(value[v], '__iter__'):
-                condition.append(cls._backtick(v) + ' IN (' + ', '.join([placeholder]*len(value[v])) + ')')
+                condition.append(cls._backtick(v) + ' IN (' + ', '.join([placeholder] * len(value[v])) + ')')
             elif value[v] is None:
                 condition.append(cls._backtick(v) + ' IS NULL')
             else:
@@ -99,7 +99,7 @@ class DictMySQLdb:
         # value[v] = unicode(value[v], chardet.detect(value[v])['encoding']) if isinstance(value[v], str) else value[v]
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(tablename),
-                        ' (', self._backtick(value), ') VALUES (', ', '.join(['%s']*len(value)), ')'])
+                        ' (', self._backtick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ')'])
 
         self.cur.execute(_sql, value.values())
         if commit:
@@ -108,22 +108,28 @@ class DictMySQLdb:
 
     def insertmany(self, tablename, field, value, commit=True):
         """
-        :param value: [(value_1, value_2,), ]
+        Insert multiple records within one query.
+        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=(['5', 'TEACHER'], ['6', 'MANAGER']))
+        :param value: list [(value_1, value_2,), ]
         """
         if type(value) is not list:
             raise TypeError('Input value should be a list')
 
-        _sql = 'INSERT INTO ' + tablename + ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s']*len(field)) + ')'
+        _sql = 'INSERT INTO ' + tablename + \
+               ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s'] * len(field)) + ')'
         self.cur.executemany(_sql, value)
         if commit:
             self.conn.commit()
 
     def upsert(self, tablename, value, commit=True):
+        """
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        """
         if type(value) is not dict:
             raise TypeError('Input value should be a dictionary')
 
         _sql = ''.join(['INSERT INTO ', self._backtick(tablename), ' (', self._backtick(value), ') VALUES ',
-                        '(', ', '.join(['%s']*len(value)), ') ',
+                        '(', ', '.join(['%s'] * len(value)), ') ',
                         'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()])])
         self.cur.execute(_sql, value.values())
         if commit:
@@ -132,6 +138,7 @@ class DictMySQLdb:
 
     def select(self, tablename, condition=None, field=None, insert=False, limit=0, multi=True):
         """
+        Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
         :param field: Put the fields you want to select in a list, the default is id
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
@@ -163,9 +170,12 @@ class DictMySQLdb:
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
-        A simplified method of select, for getting the first result from one field only
-        :param ifnone: When ifnone is a non-empty string, raise an error if query return empty result. insert parameter
-                       won't work in this mode.
+        A simplified method of select, for getting the first result in one field only. A common case of using this
+        method is getting id.
+        Example: db.get(tablename='jobs', condition={'id': 2}, field='value')
+        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
+        :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
+                       would not work in this mode.
         """
         if all(v is None for v in condition.values()):
             return None
@@ -185,6 +195,9 @@ class DictMySQLdb:
                 return ids[0]
 
     def update(self, tablename, value, condition, commit=True):
+        """
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        """
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
         result = self._condition_filter(condition)
@@ -193,6 +206,9 @@ class DictMySQLdb:
             self.commit()
 
     def delete(self, tablename, condition):
+        """
+        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None})
+        """
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._join_condition(condition)])
         result = self._condition_filter(condition)
         return self.cur.execute(_sql, result)
