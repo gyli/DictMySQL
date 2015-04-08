@@ -1,5 +1,5 @@
 # DictMySQLdb
-A mysql package above MySQL-python for more convenient database manipulation with Python dictionary.
+A mysql package on the top of MySQL-python for more convenient database manipulation with Python dictionary.
 
 Unlike DictCursor in MySQLdb, DictMySQLdb allows passing values and conditions as dictionary to MySQL.
 

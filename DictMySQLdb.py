@@ -106,7 +106,7 @@ class DictMySQLdb:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def insertmany(self, tablename, field, value, commit=True):
+    def insertmany(self, tablename, field, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
         Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=(['5', 'TEACHER'], ['6', 'MANAGER']))
@@ -115,8 +115,8 @@ class DictMySQLdb:
         if type(value) is not list:
             raise TypeError('Input value should be a list')
 
-        _sql = 'INSERT INTO ' + tablename + \
-               ' (' + ', '.join(field) + ') VALUES (' + ', '.join(['%s'] * len(field)) + ')'
+        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', tablename,
+                        ' (', ', '.join(field), ') VALUES (', ', '.join(['%s'] * len(field)) + ')'])
         self.cur.executemany(_sql, value)
         if commit:
             self.conn.commit()
