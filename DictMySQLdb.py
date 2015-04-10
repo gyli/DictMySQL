@@ -22,6 +22,7 @@ class DictMySQLdb:
         try:
             self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
                                         charset=self.charset, init_command=self.init_command)
+            self.cur = self.conn.cursor()
             return True
         except Exception:
             return False
