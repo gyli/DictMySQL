@@ -43,7 +43,7 @@ Insert multiple records:
 	
 	db.insertmany(tablename='jobs', 
 	              field=['id', 'value'], 
-	              value=(['5', 'TEACHER'], ['6', 'MANAGER']))
+	              value=[('5', 'TEACHER'), ('6', 'MANAGER')])
 	# INSERT INTO `jobs` (`id`, `value`) VALUES (5, 'TEACHER'), (6, 'MANAGER')
 
 Upsert a record with a primary key in _value_:

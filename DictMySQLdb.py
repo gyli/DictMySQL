@@ -24,29 +24,33 @@ class DictMySQLdb:
                                         charset=self.charset, init_command=self.init_command)
             self.cur = self.conn.cursor()
             return True
-        except Exception:
+        except MySQLdb.Error as e:
+            print("Mysql Error:%s" % (e,))
             return False
 
-    def sql(self, sql, args=None):
+    def query(self, sql, args=None):
+        """
+        :param sql: string. SQL query.
+        :param args: tuple. Arguments of this query.
+        """
         try:
-            n = self.cur.execute(sql, args)
-            return n
+            result = self.cur.execute(sql, args)
         except MySQLdb.Error as e:
+            result = None
             print("Mysql Error:%s\nOriginal SQL:%s" % (e, sql))
+        return result
 
     @staticmethod
-    def _backtick(value, join=True):
+    def _backtick(value):
         """
         :param value: str, list and dict are all accaptable.
-        :param join: If join is True, return a string "`id`, `name`"; otherwise, return a list ['`id`', '`name`']
-        :return: string
+        :return: string. Example: "`id`, `name`"
         """
-        if type(value) == str:
+        if isinstance(value, str):
             value = [value]
-        elif type(value) == dict:
+        elif isinstance(value, dict):
             value = value.keys()
-        result = [''.join(['`', x, '`']) for x in value]
-        return ', '.join(result) if join else result
+        return ', '.join([''.join(['`', x, '`']) for x in value])
 
     @classmethod
     def _join_values(cls, value, placeholder='%s'):
@@ -83,7 +87,7 @@ class DictMySQLdb:
             if hasattr(condition[v], '__iter__'):
                 for item in condition[v]:
                     result.append(item)
-            # still allow 0
+            # filter the None values since they would not be used as arguments
             elif condition[v] is not None:
                 result.append(condition[v])
         return result
@@ -91,8 +95,9 @@ class DictMySQLdb:
     def insert(self, tablename, value, ignore=False, commit=True):
         """
         Insert a dict into db
+        :return: int. The row id of the insert.
         """
-        if type(value) is not dict:
+        if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
 
         # TODO: unicode for input value
@@ -110,23 +115,25 @@ class DictMySQLdb:
     def insertmany(self, tablename, field, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=(['5', 'TEACHER'], ['6', 'MANAGER']))
+        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')])
         :param value: list [(value_1, value_2,), ]
+        :return: int. The row id of the LAST insert only.
         """
-        if type(value) is not list:
-            raise TypeError('Input value should be a list')
+        if not isinstance(value, (list, tuple)):
+            raise TypeError('Input value should be a list or tuple')
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', tablename,
                         ' (', ', '.join(field), ') VALUES (', ', '.join(['%s'] * len(field)) + ')'])
         self.cur.executemany(_sql, value)
         if commit:
             self.conn.commit()
+        return self.cur.lastrowid
 
     def upsert(self, tablename, value, commit=True):
         """
         Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
         """
-        if type(value) is not dict:
+        if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
 
         _sql = ''.join(['INSERT INTO ', self._backtick(tablename), ' (', self._backtick(value), ') VALUES ',
@@ -151,7 +158,7 @@ class DictMySQLdb:
             field = ['id']
 
         if condition is not None:
-            if type(condition) is not dict:
+            if not isinstance(condition, dict):
                 raise TypeError('Input value should be a dictionary')
 
             if all(v is None for v in condition.values()):
@@ -237,6 +244,13 @@ class DictMySQLdb:
 
     def rollback(self):
         self.conn.rollback()
+
+    def __del__(self):
+        try:
+            self.cur.close()
+            self.conn.close()
+        except:
+            pass
 
     def close(self):
         self.cur.close()
