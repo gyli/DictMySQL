@@ -1,9 +1,9 @@
 # DictMySQLdb
-A mysql package on the top of MySQL-python for more convenient database manipulation with Python dictionary.
+A mysql package on the top of MySQL-python or PyMySQL for more convenient database manipulation with Python dictionary. It uses MySQL-python for Python 2 and PyMySQL for Python 3 as connector.
 
-Unlike DictCursor in MySQLdb, DictMySQLdb allows passing values and conditions as dictionary to MySQL.
+DictMySQLdb simplifies and unifies the input/output of MySQL queries for you, by allowing using dictionary to pass in values and conditions into MySQL.
 
-Besides of the methods MySQL-python offers, MySQLTool provides the following methods:
+Besides of the methods that MySQL-python or PyMySQL offers, DictMySQLdb provides the following methods:
 
 * `insert()`
 * `insertmany()`
@@ -18,7 +18,14 @@ Besides of the methods MySQL-python offers, MySQLTool provides the following met
 
 Creating connection:
 
-	db = DictMySQLdb(db='occupation', host='127.0.0.1', passwd='', user='root')
+	db = DictMySQLdb(db='occupation', 
+	                 host='127.0.0.1', 
+	                 passwd='', 
+	                 user='root',
+	                 port=3306,
+	                 charset='utf8',
+	                 init_command='SET NAMES UTF8',
+	                 dictcursor=False)
 	
 Fetching one record:
 

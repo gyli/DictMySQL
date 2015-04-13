@@ -1,31 +1,49 @@
 #!/usr/bin/python
 # -*-coding:UTF-8 -*-
 
-import MySQLdb
-# import chardet
+import sys
+
+
+_ver = sys.version_info
+
+is_py2 = (_ver[0] == 2)
+
+is_py3 = (_ver[0] == 3)
+
+if is_py2:
+    import MySQLdb
+    import MySQLdb.cursors
+elif is_py3:
+    import pymysql as MySQLdb
+    import pymysql.cursors
 
 
 class DictMySQLdb:
-    def __init__(self, host, user, passwd, db, port=3306, charset='utf8', init_command='SET NAMES UTF8'):
+    def __init__(self, host, user, passwd, db, port=3306, charset='utf8', init_command='SET NAMES UTF8',
+                 dictcursor=False):
         self.host = host
         self.port = int(port)
         self.user = user
         self.passwd = passwd
         self.db = db
+        self.dictcursor = dictcursor
+        # # TODO: need to test for python2
+        self.cursorclass = MySQLdb.cursors.DictCursor if dictcursor else MySQLdb.cursors.Cursor
         self.charset = charset
         self.init_command = init_command
-        self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=db,
-                                    charset=charset, init_command=init_command)
+        self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
+                                    charset=charset, init_command=init_command, cursorclass=self.cursorclass)
         self.cur = self.conn.cursor()
 
     def reconnect(self):
         try:
-            self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
-                                        charset=self.charset, init_command=self.init_command)
+            self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
+                                        db=self.db, cursorclass=self.cursorclass, charset=self.charset,
+                                        init_command=self.init_command)
             self.cur = self.conn.cursor()
             return True
         except MySQLdb.Error as e:
-            print("Mysql Error:%s" % (e,))
+            print("Mysql Error: %s" % (e,))
             return False
 
     def query(self, sql, args=None):
@@ -37,7 +55,7 @@ class DictMySQLdb:
             result = self.cur.execute(sql, args)
         except MySQLdb.Error as e:
             result = None
-            print("Mysql Error:%s\nOriginal SQL:%s" % (e, sql))
+            print("Mysql Error: %s\nOriginal SQL:%s" % (e, sql))
         return result
 
     @staticmethod
@@ -68,7 +86,7 @@ class DictMySQLdb:
         """
         condition = []
         for v in value:
-            if hasattr(value[v], '__iter__'):
+            if isinstance(value[v], (list, tuple, dict)):
                 condition.append(cls._backtick(v) + ' IN (' + ', '.join([placeholder] * len(value[v])) + ')')
             elif value[v] is None:
                 condition.append(cls._backtick(v) + ' IS NULL')
@@ -84,7 +102,7 @@ class DictMySQLdb:
         """
         result = []
         for v in condition:
-            if hasattr(condition[v], '__iter__'):
+            if isinstance(condition[v], (list, tuple, dict)):
                 for item in condition[v]:
                     result.append(item)
             # filter the None values since they would not be used as arguments
@@ -100,14 +118,10 @@ class DictMySQLdb:
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
 
-        # TODO: unicode for input value
-        # for v in value:
-        # value[v] = unicode(value[v], chardet.detect(value[v])['encoding']) if isinstance(value[v], str) else value[v]
-
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(tablename),
                         ' (', self._backtick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ')'])
 
-        self.cur.execute(_sql, value.values())
+        self.cur.execute(_sql, list(value.values()))
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
@@ -139,42 +153,38 @@ class DictMySQLdb:
         _sql = ''.join(['INSERT INTO ', self._backtick(tablename), ' (', self._backtick(value), ') VALUES ',
                         '(', ', '.join(['%s'] * len(value)), ') ',
                         'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()])])
-        self.cur.execute(_sql, value.values())
+        self.cur.execute(_sql, list(value.values()))
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def select(self, tablename, condition=None, field=None, insert=False, limit=0, multi=True):
+    def select(self, tablename, condition=None, field=None, insert=False, limit=0):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
         :param field: Put the fields you want to select in a list, the default is id
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
-        :param limit: The max row number you want to get from the query. Default is 0 which means no limit
-        :param multi: If multi==False, return the value in first field of first row, otherwise, return all fields
-                      in a tuple.
+        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit
         """
-        if field is None:
-            field = ['id']
+        # field is required
+        if not field:
+            raise ValueError('Argument field should not be empty.')
 
-        if condition is not None:
-            if not isinstance(condition, dict):
-                raise TypeError('Input value should be a dictionary')
+        # condition must be a dict
+        if not isinstance(condition, dict):
+            raise TypeError('Input value should be a dictionary')
 
-            if all(v is None for v in condition.values()):
-                return None
+        _sql = ''.join(['SELECT ', self._backtick(field),
+                        ' FROM ', self._backtick(tablename),
+                        ''.join([' WHERE ', self._join_condition(condition)]) if condition else '',
+                        ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
-        _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
-                        '' if condition is None else ''.join([' WHERE ', self._join_condition(condition)]),
-                        '' if limit == 0 else ''.join([' LIMIT ', str(limit)])])
-        if condition is None:
-            self.cur.execute(_sql)
+        if not condition:
+            self.cur.execute(_sql)  # If condition is None, select all rows
         else:
-            result = self._condition_filter(condition)
-            self.cur.execute(_sql, result)
+            self.cur.execute(_sql, self._condition_filter(condition))
         ids = self.cur.fetchall()
-        return (self.insert(tablename=tablename, value=condition) if insert else None) if ids == () else (
-            tuple(i for i in (ids[0] if limit else ids)) if multi else ids[0][0])
+        return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
@@ -185,22 +195,19 @@ class DictMySQLdb:
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
-        if all(v is None for v in condition.values()):
-            return None
-
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
                         ' WHERE ', self._join_condition(condition), ' LIMIT 1'])
-
         result = self._condition_filter(condition)
         self.cur.execute(_sql, result)
         ids = self.cur.fetchone()
-        if ifnone is None:
-            return (self.insert(tablename=tablename, value=condition) if insert else None) if ids is None else ids[0]
+        _index = field if self.dictcursor else 0
+        if ids:
+            return ids[_index]
         else:
-            if ids is None:
+            if ifnone:
                 raise ValueError(ifnone)
             else:
-                return ids[0]
+                return self.insert(tablename=tablename, value=condition) if insert else None
 
     def update(self, tablename, value, condition, commit=True):
         """
@@ -209,7 +216,7 @@ class DictMySQLdb:
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
         result = self._condition_filter(condition)
-        self.cur.execute(_sql, (value.values() + result))
+        self.cur.execute(_sql, (list(value.values()) + result))
         if commit:
             self.commit()
 
@@ -222,8 +229,8 @@ class DictMySQLdb:
         return self.cur.execute(_sql, result)
 
     def now(self):
-        self.cur.execute('SELECT NOW();')
-        return self.cur.fetchone()[0].strftime("%Y-%m-%d %H:%M:%S")
+        self.cur.execute('SELECT NOW() as now;')
+        return self.cur.fetchone()['now' if self.dictcursor else 0].strftime("%Y-%m-%d %H:%M:%S")
 
     def fetchone(self):
         result = self.cur.fetchone()
