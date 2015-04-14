@@ -27,7 +27,6 @@ class DictMySQLdb:
         self.passwd = passwd
         self.db = db
         self.dictcursor = dictcursor
-        # # TODO: need to test for python2
         self.cursorclass = MySQLdb.cursors.DictCursor if dictcursor else MySQLdb.cursors.Cursor
         self.charset = charset
         self.init_command = init_command
@@ -37,6 +36,7 @@ class DictMySQLdb:
 
     def reconnect(self):
         try:
+            self.cursorclass = MySQLdb.cursors.DictCursor if self.dictcursor else MySQLdb.cursors.Cursor
             self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
                                         db=self.db, cursorclass=self.cursorclass, charset=self.charset,
                                         init_command=self.init_command)
@@ -62,7 +62,7 @@ class DictMySQLdb:
     def _backtick(value):
         """
         :param value: str, list and dict are all accaptable.
-        :return: string. Example: "`id`, `name`"
+        :return: string. Example: "`id`, `name`".
         """
         if isinstance(value, str):
             value = [value]
@@ -82,7 +82,7 @@ class DictMySQLdb:
     def _join_condition(cls, value, placeholder='%s'):
         """
         Return "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
-        :return: string
+        :return: string.
         """
         condition = []
         for v in value:
@@ -97,8 +97,8 @@ class DictMySQLdb:
     @staticmethod
     def _condition_filter(condition):
         """
-        Filter the None values and convert iterable items to elements in the original list
-        :return: list
+        Filter the None values and convert iterable items to elements in the original list.
+        :return: list.
         """
         result = []
         for v in condition:
@@ -112,7 +112,7 @@ class DictMySQLdb:
 
     def insert(self, tablename, value, ignore=False, commit=True):
         """
-        Insert a dict into db
+        Insert a dict into db.
         :return: int. The row id of the insert.
         """
         if not isinstance(value, dict):
@@ -129,8 +129,8 @@ class DictMySQLdb:
     def insertmany(self, tablename, field, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')])
-        :param value: list [(value_1, value_2,), ]
+        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
+        :param value: list. Example: [(value_1, value_2,), ].
         :return: int. The row id of the LAST insert only.
         """
         if not isinstance(value, (list, tuple)):
@@ -145,7 +145,7 @@ class DictMySQLdb:
 
     def upsert(self, tablename, value, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         """
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
@@ -162,9 +162,9 @@ class DictMySQLdb:
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
-        :param field: Put the fields you want to select in a list, the default is id
-        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
-        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit
+        :param field: Put the fields you want to select in a list, the default is id.
+        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
+        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit.
         """
         # field is required
         if not field:
@@ -190,8 +190,8 @@ class DictMySQLdb:
         """
         A simplified method of select, for getting the first result in one field only. A common case of using this
         method is getting id.
-        Example: db.get(tablename='jobs', condition={'id': 2}, field='value')
-        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
+        Example: db.get(tablename='jobs', condition={'id': 2}, field='value').
+        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
@@ -200,7 +200,7 @@ class DictMySQLdb:
         result = self._condition_filter(condition)
         self.cur.execute(_sql, result)
         ids = self.cur.fetchone()
-        _index = field if self.dictcursor else 0
+        _index = 0 if self.cursorclass is MySQLdb.cursors.Cursor else field
         if ids:
             return ids[_index]
         else:
@@ -211,7 +211,7 @@ class DictMySQLdb:
 
     def update(self, tablename, value, condition, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         """
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
@@ -222,7 +222,7 @@ class DictMySQLdb:
 
     def delete(self, tablename, condition):
         """
-        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None})
+        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._join_condition(condition)])
         result = self._condition_filter(condition)
@@ -230,7 +230,7 @@ class DictMySQLdb:
 
     def now(self):
         self.cur.execute('SELECT NOW() as now;')
-        return self.cur.fetchone()['now' if self.dictcursor else 0].strftime("%Y-%m-%d %H:%M:%S")
+        return self.cur.fetchone()[0 if self.cursorclass is MySQLdb.cursors.Cursor else 'now'].strftime("%Y-%m-%d %H:%M:%S")
 
     def fetchone(self):
         result = self.cur.fetchone()

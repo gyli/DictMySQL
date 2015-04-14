@@ -5,6 +5,7 @@ DictMySQLdb simplifies and unifies the input/output of MySQL queries for you, by
 
 Besides of the methods that MySQL-python or PyMySQL offers, DictMySQLdb provides the following methods:
 
+* `query()`
 * `insert()`
 * `insertmany()`
 * `upsert()`
