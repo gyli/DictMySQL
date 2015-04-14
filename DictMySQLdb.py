@@ -5,9 +5,7 @@ import sys
 
 
 _ver = sys.version_info
-
 is_py2 = (_ver[0] == 2)
-
 is_py3 = (_ver[0] == 3)
 
 if is_py2:
@@ -36,6 +34,7 @@ class DictMySQLdb:
 
     def reconnect(self):
         try:
+            self.cursorclass = MySQLdb.cursors.DictCursor if self.dictcursor else MySQLdb.cursors.Cursor
             self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
                                         db=self.db, cursorclass=self.cursorclass, charset=self.charset,
                                         init_command=self.init_command)
@@ -61,7 +60,7 @@ class DictMySQLdb:
     def _backtick(value):
         """
         :param value: str, list and dict are all accaptable.
-        :return: string. Example: "`id`, `name`"
+        :return: string. Example: "`id`, `name`".
         """
         if isinstance(value, str):
             value = [value]
@@ -73,7 +72,6 @@ class DictMySQLdb:
     def _join_values(cls, value, placeholder='%s'):
         """
         Return "`id` = %s, `name` = %s". Only used in update(), no need to convert NULL values.
-        :return: string
         """
         return ', '.join([' = '.join([cls._backtick(v), placeholder]) for v in value])
 
@@ -81,37 +79,33 @@ class DictMySQLdb:
     def _join_condition(cls, value, placeholder='%s'):
         """
         Return "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
-        :return: string
         """
         condition = []
         for v in value:
             if isinstance(value[v], (list, tuple, dict)):
-                condition.append(cls._backtick(v) + ' IN (' + ', '.join([placeholder] * len(value[v])) + ')')
+                _cond = ' IN (' + ', '.join([placeholder] * len(value[v])) + ')'
             elif value[v] is None:
-                condition.append(cls._backtick(v) + ' IS NULL')
+                _cond = ' IS NULL'
             else:
-                condition.append(cls._backtick(v) + ' = ' + placeholder)
+                _cond = ' = ' + placeholder
+            condition.append(cls._backtick(v) + _cond)
         return ' AND '.join(condition)
 
     @staticmethod
     def _condition_filter(condition):
         """
-        Filter the None values and convert iterable items to elements in the original list
-        :return: list
+        Filter the None values and convert iterable items to elements in the original list.
         """
-        result = []
+        result = ()
         for v in condition:
-            if isinstance(condition[v], (list, tuple, dict)):
-                for item in condition[v]:
-                    result.append(item)
             # filter the None values since they would not be used as arguments
-            elif condition[v] is not None:
-                result.append(condition[v])
+            if isinstance(condition[v], (list, tuple, dict)) and condition[v] is not None:
+                result += tuple(condition[v])
         return result
 
     def insert(self, tablename, value, ignore=False, commit=True):
         """
-        Insert a dict into db
+        Insert a dict into db.
         :return: int. The row id of the insert.
         """
         if not isinstance(value, dict):
@@ -119,8 +113,8 @@ class DictMySQLdb:
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(tablename),
                         ' (', self._backtick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ')'])
-
-        self.cur.execute(_sql, list(value.values()))
+        _args = tuple(value.values())
+        self.cur.execute(_sql, _args)
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
@@ -128,8 +122,8 @@ class DictMySQLdb:
     def insertmany(self, tablename, field, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')])
-        :param value: list [(value_1, value_2,), ]
+        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
+        :param value: list. Example: [(value_1, value_2,), ].
         :return: int. The row id of the LAST insert only.
         """
         if not isinstance(value, (list, tuple)):
@@ -137,14 +131,15 @@ class DictMySQLdb:
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', tablename,
                         ' (', ', '.join(field), ') VALUES (', ', '.join(['%s'] * len(field)) + ')'])
-        self.cur.executemany(_sql, value)
+        _args = tuple(value)
+        self.cur.executemany(_sql, _args)
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
 
     def upsert(self, tablename, value, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         """
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
@@ -152,7 +147,8 @@ class DictMySQLdb:
         _sql = ''.join(['INSERT INTO ', self._backtick(tablename), ' (', self._backtick(value), ') VALUES ',
                         '(', ', '.join(['%s'] * len(value)), ') ',
                         'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()])])
-        self.cur.execute(_sql, list(value.values()))
+        _args = tuple(value.values())
+        self.cur.execute(_sql, _args)
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
@@ -161,13 +157,16 @@ class DictMySQLdb:
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
-        :param field: Put the fields you want to select in a list, the default is id
-        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
-        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit
+        :param field: Put the fields you want to select in a list, the default is id.
+        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
+        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit.
         """
         # field is required
         if not field:
             raise ValueError('Argument field should not be empty.')
+
+        if not condition:
+            condition = {}
 
         # condition must be a dict
         if not isinstance(condition, dict):
@@ -178,10 +177,8 @@ class DictMySQLdb:
                         ''.join([' WHERE ', self._join_condition(condition)]) if condition else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
-        if not condition:
-            self.cur.execute(_sql)  # If condition is None, select all rows
-        else:
-            self.cur.execute(_sql, self._condition_filter(condition))
+        _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
+        self.cur.execute(_sql, _args)
         ids = self.cur.fetchall()
         return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
 
@@ -189,19 +186,18 @@ class DictMySQLdb:
         """
         A simplified method of select, for getting the first result in one field only. A common case of using this
         method is getting id.
-        Example: db.get(tablename='jobs', condition={'id': 2}, field='value')
-        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row
+        Example: db.get(tablename='jobs', condition={'id': 2}, field='value').
+        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
                         ' WHERE ', self._join_condition(condition), ' LIMIT 1'])
-        result = self._condition_filter(condition)
-        self.cur.execute(_sql, result)
+        _args = self._condition_filter(condition)
+        self.cur.execute(_sql, _args)
         ids = self.cur.fetchone()
-        _index = field if self.dictcursor else 0
         if ids:
-            return ids[_index]
+            return ids[0 if self.cursorclass is MySQLdb.cursors.Cursor else field]
         else:
             if ifnone:
                 raise ValueError(ifnone)
@@ -210,34 +206,32 @@ class DictMySQLdb:
 
     def update(self, tablename, value, condition, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
+        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         """
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
-        result = self._condition_filter(condition)
-        self.cur.execute(_sql, (list(value.values()) + result))
+        _args = tuple(value.values()) + self._condition_filter(condition)
+        self.cur.execute(_sql, _args)
         if commit:
             self.commit()
 
     def delete(self, tablename, condition):
         """
-        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None})
+        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._join_condition(condition)])
-        result = self._condition_filter(condition)
-        return self.cur.execute(_sql, result)
+        _args = self._condition_filter(condition)
+        return self.cur.execute(_sql, _args)
 
     def now(self):
         self.cur.execute('SELECT NOW() as now;')
-        return self.cur.fetchone()['now' if self.dictcursor else 0].strftime("%Y-%m-%d %H:%M:%S")
+        return self.cur.fetchone()[0 if self.cursorclass is MySQLdb.cursors.Cursor else 'now'].strftime("%Y-%m-%d %H:%M:%S")
 
     def fetchone(self):
-        result = self.cur.fetchone()
-        return result
+        return self.cur.fetchone()
 
     def fetchall(self):
-        result = self.cur.fetchall()
-        return result
+        return self.cur.fetchall()
 
     def lastrowid(self):
         return self.cur.lastrowid
