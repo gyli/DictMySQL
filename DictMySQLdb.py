@@ -27,7 +27,6 @@ class DictMySQLdb:
         self.passwd = passwd
         self.db = db
         self.dictcursor = dictcursor
-        # # TODO: need to test for python2
         self.cursorclass = MySQLdb.cursors.DictCursor if dictcursor else MySQLdb.cursors.Cursor
         self.charset = charset
         self.init_command = init_command
