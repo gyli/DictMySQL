@@ -99,8 +99,10 @@ class DictMySQLdb:
         result = ()
         for v in condition:
             # filter the None values since they would not be used as arguments
-            if isinstance(condition[v], (list, tuple, dict)) and condition[v] is not None:
+            if isinstance(condition[v], (list, tuple, dict)):
                 result += tuple(condition[v])
+            elif condition[v] is not None:
+                result += (condition[v],)
         return result
 
     def insert(self, tablename, value, ignore=False, commit=True):
