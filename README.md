@@ -19,7 +19,7 @@ Besides of the methods that MySQL-python or PyMySQL offers, DictMySQLdb provides
 
 Creating connection:
 
-	from DictMySQLdb import DictMySQLdb
+	from dictmysqldb import DictMySQLdb
 	db = DictMySQLdb(db='occupation', 
 	                 host='127.0.0.1', 
 	                 passwd='', 
