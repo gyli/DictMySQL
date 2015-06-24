@@ -55,7 +55,12 @@ Inserting multiple records:
 	              value=[('5', 'TEACHER'), ('6', 'MANAGER')])
 	# INSERT INTO `jobs` (`id`, `value`) VALUES (5, 'TEACHER'), (6, 'MANAGER')
 
-Upserting a record with a primary key in _value_:
+Update a record:
+	
+	db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3})
+	# UPDATE `jobs` SET `value`='MECHANIC' WHERE id=3
+
+Upserting a record. At least one primary key in _value_ is required, which would be used as condition when updating:
 	
 	db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'})
 	# INSERT INTO `jobs` (`id`, `value`) VALUES (3, 'MECHANIC') ON DUPLICATE KEY UPDATE id=VALUES(id), value=VALUES(value)

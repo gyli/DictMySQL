@@ -141,7 +141,7 @@ class DictMySQLdb:
 
     def upsert(self, tablename, value, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
+        Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         """
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
@@ -208,7 +208,7 @@ class DictMySQLdb:
 
     def update(self, tablename, value, condition, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
+        Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
         """
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
                         ' WHERE ', self._join_condition(condition)])
