@@ -1,4 +1,4 @@
-# DictMySQLdb
+# DictMySQLdb [![Build Status](https://travis-ci.org/ligyxy/DictMySQLdb.svg?branch=master)](https://travis-ci.org/ligyxy/DictMySQLdb)
 A mysql package on the top of [MySQL-python](http://mysql-python.sourceforge.net/MySQLdb.html, "MySQL-python") or [PyMySQL](https://github.com/PyMySQL/PyMySQL, "PyMySQL") for more convenient database manipulation with Python dictionary. It uses MySQL-python for Python 2 and PyMySQL for Python 3 as connector.
 
 DictMySQLdb simplifies and unifies the input/output of MySQL queries for you, by allowing using dictionary to pass in values and conditions into MySQL.
