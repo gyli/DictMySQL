@@ -157,11 +157,11 @@ class DictMySQLdb:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def select(self, tablename, condition=None, field=None, insert=False, limit=0):
+    def select(self, tablename, field, condition=None, insert=False, limit=0):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
-        :param field: Put the fields you want to select in a list, the default is id.
+        :param field: Put the fields you want to select in a list.
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
         :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit.
         """
@@ -185,6 +185,21 @@ class DictMySQLdb:
         self.cur.execute(_sql, _args)
         ids = self.cur.fetchall()
         return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
+
+    def join_select(self, from_table, join_table, field, condition, limit=0):
+        """
+        Select values from joined tables.
+        :param from_table: {"table": "TableName", "as": "T"}
+        :param join_table: [{"table": "TableName2", "as": "T2", "on": "T2.id=T.t2_id"}, ]
+        :param field: ["T2.value", "T.value"]
+        """
+        _sql = ''.join(['SELECT ', self._backtick(field),
+                        ' FROM ', self._backtick(from_table),
+                        ' '.join([' '.join(['JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
+                        ''.join([' WHERE ', self._join_condition(condition)]) if condition else '',
+                        ''.join([' LIMIT ', str(limit)]) if limit else ''])
+
+        pass
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """

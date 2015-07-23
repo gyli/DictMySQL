@@ -14,6 +14,7 @@ Besides of the methods that MySQL-python or PyMySQL offers, DictMySQLdb provides
 * `select()`
 * `delete()`
 * `now()`
+* `last_insert_id()`
 
 ## Examples
 
