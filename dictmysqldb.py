@@ -18,7 +18,7 @@ elif is_py3:
 
 class DictMySQLdb:
     def __init__(self, host, user, passwd, db, port=3306, charset='utf8', init_command='SET NAMES UTF8',
-                 dictcursor=False):
+                 dictcursor=False, use_unicode=True):
         self.host = host
         self.port = int(port)
         self.user = user
@@ -28,8 +28,9 @@ class DictMySQLdb:
         self.cursorclass = MySQLdb.cursors.DictCursor if dictcursor else MySQLdb.cursors.Cursor
         self.charset = charset
         self.init_command = init_command
+        self.use_unicode = use_unicode
         self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
-                                    charset=charset, init_command=init_command, cursorclass=self.cursorclass)
+                                    charset=charset, init_command=init_command, cursorclass=self.cursorclass, use_unicode=self.use_unicode)
         self.cur = self.conn.cursor()
 
     def reconnect(self):
@@ -37,7 +38,8 @@ class DictMySQLdb:
             self.cursorclass = MySQLdb.cursors.DictCursor if self.dictcursor else MySQLdb.cursors.Cursor
             self.conn = MySQLdb.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
                                         db=self.db, cursorclass=self.cursorclass, charset=self.charset,
-                                        init_command=self.init_command)
+                                        init_command=self.init_command,
+                                        use_unicode=self.use_unicode)
             self.cur = self.conn.cursor()
             return True
         except MySQLdb.Error as e:
