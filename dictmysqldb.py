@@ -231,6 +231,10 @@ class DictMySQLdb:
         self.cur.execute('SELECT NOW() as now;')
         return self.cur.fetchone()[0 if self.cursorclass is MySQLdb.cursors.Cursor else 'now'].strftime("%Y-%m-%d %H:%M:%S")
 
+    def last_insert_id(self):
+        self.query("SELECT LAST_INSERT_ID() AS lid")
+        return self.cur.fetchone()[0 if self.cursorclass is MySQLdb.cursors.Cursor else 'lid']
+
     def fetchone(self):
         return self.cur.fetchone()
 
