@@ -5,8 +5,9 @@ python:
 install:
     - if [ "${PYTHON}" == "3.4" ]; then
           pip3 install PyMySQL;
-      else
-          pip install MySQL-python
+      fi;
+    - if [ "${PYTHON}" == "2.7" ]; then
+          pip install MySQL-python;
       fi;
 script:
     - python setup.py test
