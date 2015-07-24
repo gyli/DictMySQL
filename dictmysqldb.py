@@ -61,26 +61,24 @@ class DictMySQLdb:
     @staticmethod
     def _backtick(value):
         """
-        :param value: str, list and dict are all accaptable.
+        :type value: str|list|dict
         :return: string. Example: "`id`, `name`".
         """
-        if isinstance(value, str):
+        if isinstance(value, (str, unicode)):
             value = [value]
-        elif isinstance(value, dict):
-            value = value.keys()
-        return ', '.join([''.join(['`', x, '`']) for x in value])
+        # If there's a dot, only append the backticks to the first part
+        return ', '.join(['.'.join(['`' + v.split('.')[0] + '`'] + v.split('.')[1:]) for v in value])
 
-    @classmethod
-    def _join_values(cls, value, placeholder='%s'):
+    def _concat_values(self, value, placeholder='%s'):
         """
         Return "`id` = %s, `name` = %s". Only used in update(), no need to convert NULL values.
         """
-        return ', '.join([' = '.join([cls._backtick(v), placeholder]) for v in value])
+        return ', '.join([' = '.join([self._backtick(v), placeholder]) for v in value])
 
-    @classmethod
-    def _join_condition(cls, value, placeholder='%s'):
+    def _concat_conditions(self, value, placeholder='%s'):
         """
-        Return "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
+        Accept: {'id': 5, 'name': None}
+        Return: "`id` = %s AND `name` IS NULL"
         """
         condition = []
         for v in value:
@@ -90,7 +88,57 @@ class DictMySQLdb:
                 _cond = ' IS NULL'
             else:
                 _cond = ' = ' + placeholder
-            condition.append(cls._backtick(v) + _cond)
+            condition.append(self._backtick(v) + _cond)
+        return ' AND '.join(condition)
+
+    def _concat_complex_condition(self, value, placeholder='%s'):
+        """
+        Accept:
+        {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, 'IS': None}, }
+        {'OR': [{'LIKE': {'zipcode': '20009%'}}, {'value': {'<=': 5, 'IS': None}}]}
+        {'OR': {'AND': {'zipcode': {'LIKE': '20009%'}}, 'value': {'<=': 5, 'IS': None}, }}
+        {'value': {'AND': {'<=': 5, '>=': 2}}}
+
+        Return: "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
+        """
+        # TODO: working on here
+        result = ""
+        def _combining(_dict_cond, _operator='AND', _string_cond=None):
+            global result
+            i = 0
+            if isinstance(_dict_cond, dict) and set(_dict_cond.keys()) & {'AND', 'OR'}:
+                result += '( '
+                for v in _dict_cond.values()[0]:
+                    if i > 0:
+                        result += ' '+_dict_cond.keys()[0]+' '
+                    if isinstance(v, list):
+                        _combining(v[0], _dict_cond.keys()[0])
+                    else:
+                        _combining(v, _dict_cond.keys()[0])
+                    i += 1
+                result += ') '
+            elif isinstance(_dict_cond, dict) and set(_dict_cond.keys()) & {'=', '<', '>', '<=', '>=', '<>', 'IS', 'LIKE', 'BETWEEN'}:
+                _value = _dict_cond.values()[0]
+                if isinstance(_value, dict):
+                    _value = [_value]
+                for v in _value:
+                    # v = {'A': 1}
+                    _combining(v, _dict_cond.keys()[0])
+            else:
+                result += ' '.join(_dict_cond.keys()+[_operator]+_dict_cond.values())
+
+        _combining({'OR': [{'<': {'zipcode': '20009%'}}, {'AND': [{'=':{'B':'2'}}, {'<':{'C': '3'}}]}]})
+
+
+        condition = []
+        for v in value:
+            if isinstance(value[v], (list, tuple, dict)):
+                _cond = ' IN (' + ', '.join([placeholder] * len(value[v])) + ')'
+            elif value[v] is None:
+                _cond = ' IS NULL'
+            else:
+                _cond = ' = ' + placeholder
+            condition.append(self._backtick(v) + _cond)
         return ' AND '.join(condition)
 
     @staticmethod
@@ -127,7 +175,8 @@ class DictMySQLdb:
         """
         Insert multiple records within one query.
         Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
-        :param value: list. Example: [(value_1, value_2,), ].
+        :type value: list
+        :param value: Example: [(value_1, value_2,), ].
         :return: int. The row id of the LAST insert only.
         """
         if not isinstance(value, (list, tuple)):
@@ -163,22 +212,12 @@ class DictMySQLdb:
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
         :param field: Put the fields you want to select in a list.
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
-        :param limit: int. The max row number you want to get from the query. Default is 0 which means no limit.
+        :type limit: int
+        :param limit: The max row number you want to get from the query. Default is 0 which means no limit.
         """
-        # field is required
-        if not field:
-            raise ValueError('Argument field should not be empty.')
-
-        if not condition:
-            condition = {}
-
-        # condition must be a dict
-        if not isinstance(condition, dict):
-            raise TypeError('Input value should be a dictionary')
-
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', self._backtick(tablename),
-                        ''.join([' WHERE ', self._join_condition(condition)]) if condition else '',
+                        ''.join([' WHERE ', self._concat_conditions(condition)]) if condition else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
         _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
@@ -186,20 +225,29 @@ class DictMySQLdb:
         ids = self.cur.fetchall()
         return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
 
-    def join_select(self, from_table, join_table, field, condition, limit=0):
+    def join_select(self, from_table, join_table, field, condition=None, where=None, limit=0):
         """
         Select values from joined tables.
         :param from_table: {"table": "TableName", "as": "T"}
-        :param join_table: [{"table": "TableName2", "as": "T2", "on": "T2.id=T.t2_id"}, ]
+        :param join_table: [{"table": "TableName2", "as": "T2", "on": "T2.id=T.t2_id", 'type': 'LEFT'}, ]
+                           type is optional.
         :param field: ["T2.value", "T.value"]
+        :param condition: Simple where condition in the query, only support equal condition and AND operator.
+                          Example: {'value': 5, }
+        :param where: Complex condition. {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, '>=': 1}, }
         """
+        # TODO: make 'as' optional
         _sql = ''.join(['SELECT ', self._backtick(field),
-                        ' FROM ', self._backtick(from_table),
-                        ' '.join([' '.join(['JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
-                        ''.join([' WHERE ', self._join_condition(condition)]) if condition else '',
+                        ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'],
+                        ' '.join([' '.join([t.get('type', ''), ' JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
+                        ' WHERE ' if condition or where else '',
+                        self._concat_conditions(condition) if condition else '',
+                        self._concat_complex_condition(where) if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
-        pass
+        _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
+        self.cur.execute(_sql, _args)
+        return self.cur.fetchall()
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
@@ -211,7 +259,7 @@ class DictMySQLdb:
                        would not work in this mode.
         """
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
-                        ' WHERE ', self._join_condition(condition), ' LIMIT 1'])
+                        ' WHERE ', self._concat_conditions(condition), ' LIMIT 1'])
         _args = self._condition_filter(condition)
         self.cur.execute(_sql, _args)
         ids = self.cur.fetchone()
@@ -227,8 +275,8 @@ class DictMySQLdb:
         """
         Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
         """
-        _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._join_values(value),
-                        ' WHERE ', self._join_condition(condition)])
+        _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._concat_values(value),
+                        ' WHERE ', self._concat_conditions(condition)])
         _args = tuple(value.values()) + self._condition_filter(condition)
         self.cur.execute(_sql, _args)
         if commit:
@@ -238,7 +286,7 @@ class DictMySQLdb:
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
-        _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._join_condition(condition)])
+        _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._concat_conditions(condition)])
         _args = self._condition_filter(condition)
         return self.cur.execute(_sql, _args)
 
