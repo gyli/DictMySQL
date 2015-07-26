@@ -91,56 +91,6 @@ class DictMySQLdb:
             condition.append(self._backtick(v) + _cond)
         return ' AND '.join(condition)
 
-    def _concat_complex_condition(self, value, placeholder='%s'):
-        """
-        Accept:
-        {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, 'IS': None}, }
-        {'OR': [{'LIKE': {'zipcode': '20009%'}}, {'value': {'<=': 5, 'IS': None}}]}
-        {'OR': {'AND': {'zipcode': {'LIKE': '20009%'}}, 'value': {'<=': 5, 'IS': None}, }}
-        {'value': {'AND': {'<=': 5, '>=': 2}}}
-
-        Return: "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
-        """
-        # TODO: working on here
-        result = ""
-        def _combining(_dict_cond, _operator='AND', _string_cond=None):
-            global result
-            i = 0
-            if isinstance(_dict_cond, dict) and set(_dict_cond.keys()) & {'AND', 'OR'}:
-                result += '( '
-                for v in _dict_cond.values()[0]:
-                    if i > 0:
-                        result += ' '+_dict_cond.keys()[0]+' '
-                    if isinstance(v, list):
-                        _combining(v[0], _dict_cond.keys()[0])
-                    else:
-                        _combining(v, _dict_cond.keys()[0])
-                    i += 1
-                result += ') '
-            elif isinstance(_dict_cond, dict) and set(_dict_cond.keys()) & {'=', '<', '>', '<=', '>=', '<>', 'IS', 'LIKE', 'BETWEEN'}:
-                _value = _dict_cond.values()[0]
-                if isinstance(_value, dict):
-                    _value = [_value]
-                for v in _value:
-                    # v = {'A': 1}
-                    _combining(v, _dict_cond.keys()[0])
-            else:
-                result += ' '.join(_dict_cond.keys()+[_operator]+_dict_cond.values())
-
-        _combining({'OR': [{'<': {'zipcode': '20009%'}}, {'AND': [{'=':{'B':'2'}}, {'<':{'C': '3'}}]}]})
-
-
-        condition = []
-        for v in value:
-            if isinstance(value[v], (list, tuple, dict)):
-                _cond = ' IN (' + ', '.join([placeholder] * len(value[v])) + ')'
-            elif value[v] is None:
-                _cond = ' IS NULL'
-            else:
-                _cond = ' = ' + placeholder
-            condition.append(self._backtick(v) + _cond)
-        return ' AND '.join(condition)
-
     @staticmethod
     def _condition_filter(condition):
         """
@@ -225,7 +175,7 @@ class DictMySQLdb:
         ids = self.cur.fetchall()
         return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
 
-    def join_select(self, from_table, join_table, field, condition=None, where=None, limit=0):
+    def join_select(self, from_table, join_table, field, condition=None, limit=0):
         """
         Select values from joined tables.
         :param from_table: {"table": "TableName", "as": "T"}
@@ -234,18 +184,21 @@ class DictMySQLdb:
         :param field: ["T2.value", "T.value"]
         :param condition: Simple where condition in the query, only support equal condition and AND operator.
                           Example: {'value': 5, }
-        :param where: Complex condition. {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, '>=': 1}, }
         """
-        # TODO: make 'as' optional
+        if not condition:
+            condition = {}
+
+        _args = self._condition_filter(condition)
+
         _sql = ''.join(['SELECT ', self._backtick(field),
-                        ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'],
-                        ' '.join([' '.join([t.get('type', ''), ' JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
-                        ' WHERE ' if condition or where else '',
+                        ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'], ' ',
+                        ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
+                        ' WHERE ',
                         self._concat_conditions(condition) if condition else '',
-                        self._concat_complex_condition(where) if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
-        _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
+        print _sql
+
         self.cur.execute(_sql, _args)
         return self.cur.fetchall()
 
