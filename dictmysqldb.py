@@ -91,6 +91,64 @@ class DictMySQLdb:
             condition.append(self._backtick(v) + _cond)
         return ' AND '.join(condition)
 
+    def _concat_complex_condition(self, condition, placeholder='%s'):
+        """
+        Accept:
+        {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, 'IS': None}, }
+        {'OR': [{'LIKE': {'zipcode': '20009%'}}, {'value': {'<=': 5, 'IS': None}}]}
+        {'OR': {'AND': {'zipcode': {'LIKE': '20009%'}}, 'value': {'<=': 5, 'IS': None}, }}
+        {'value': {'AND': {'<=': 5, '>=': 2}}}
+
+        Return: "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
+        """
+        result = {'q': [], 'v': ()}
+
+        _operators = {'=', '<', '>', '<=', '>=', '<>', 'IS', 'LIKE', 'BETWEEN'}
+
+        result = {'q': [], 'v': ()}
+        placeholder='%s'
+
+        def _combining(_cond, _operator=None, upper_key=None, connector=None):
+            # {'OR': [{'zipcode': {'<': '22}}]}
+            if isinstance(_cond, dict):
+                i = 1
+                for k, v in _cond.iteritems():
+                    if k in {'$AND', '$OR'}:
+                        result['q'].append('( ')
+                        _combining(v, connector=k)
+                        result['q'].append(') ')
+                    # {'>':{'value':10}}
+                    elif k in _operators:
+                        _combining(v, _operator=k, upper_key=upper_key)
+                    # {'value':10}
+                    else:
+                        _combining(v, upper_key=k, _operator=_operator)
+                    # default 'AND' except for the last one
+                    if i < len(_cond):
+                        result['q'].append(' AND ')
+                    i += 1
+            elif isinstance(_cond, list):
+                l_index = 1
+                for l in _cond:
+                    _combining(l, _operator=_operator, upper_key=upper_key, connector=connector)
+                    if l_index < len(_cond):
+                        result['q'].append(connector)
+                    l_index += 1
+            else:
+                if _operator:
+                    s_q = ' '.join([upper_key] + [_operator] + [placeholder])
+                else:
+                    s_q = ' '.join([upper_key] + ['='] + [placeholder])
+                result['q'].append(' (' + s_q + ') ')
+
+# ' AND '.join([])
+# {'$AND': {'$OR': [{'>':{'value':10}, 'value2': 20}, {'value2': 20}], '$OR': [{'value3': 30}, {'value3': 30}]}
+#         # _combining({'OR': [{'<': {'zipcode': None}}, {'AND': [{'=':{'B':'2'}}, {'<':{'C': '3'}}]}]})
+#         _combining({'$OR': [{'$AND': [{'>': {'z1':222}}, {'<': {'z1':222}}]}, {'z3': {'>': 222}}]})
+        ''.join(result['q'])
+
+        return [''.join(result['q']), result['v']]
+
     @staticmethod
     def _condition_filter(condition):
         """
@@ -175,7 +233,7 @@ class DictMySQLdb:
         ids = self.cur.fetchall()
         return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
 
-    def join_select(self, from_table, join_table, field, condition=None, limit=0):
+    def join_select(self, from_table, join_table, field, condition=None, where=None, limit=0):
         """
         Select values from joined tables.
         :param from_table: {"table": "TableName", "as": "T"}
@@ -184,17 +242,24 @@ class DictMySQLdb:
         :param field: ["T2.value", "T.value"]
         :param condition: Simple where condition in the query, only support equal condition and AND operator.
                           Example: {'value': 5, }
+        :param where: Complex condition. {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, '>=': 1}, }
         """
+        # TODO: make 'as' optional
         if not condition:
             condition = {}
 
         _args = self._condition_filter(condition)
+        if where:
+            where_q, where_v = self._concat_complex_condition(where)
+            _args += where_v
 
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'], ' ',
                         ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
-                        ' WHERE ',
+                        ' WHERE ' if condition or where else '',
                         self._concat_conditions(condition) if condition else '',
+                        ' AND ' if condition and where else '',
+                        where_q if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
         print _sql
