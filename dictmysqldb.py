@@ -75,7 +75,7 @@ class DictMySQLdb:
         """
         return ', '.join([' = '.join([self._backtick(v), placeholder]) for v in value])
 
-    def _concat_conditions(self, value, placeholder='%s'):
+    def _condition_parser(self, value, placeholder='%s'):
         """
         Accept: {'id': 5, 'name': None}
         Return: "`id` = %s AND `name` IS NULL"
@@ -91,7 +91,7 @@ class DictMySQLdb:
             condition.append(self._backtick(v) + _cond)
         return ' AND '.join(condition)
 
-    def _concat_complex_condition(self, condition, placeholder='%s'):
+    def _where_parser(self, condition, placeholder='%s'):
         """
         Accept:
         {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, 'IS': None}, }
@@ -225,7 +225,7 @@ class DictMySQLdb:
         """
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', self._backtick(tablename),
-                        ''.join([' WHERE ', self._concat_conditions(condition)]) if condition else '',
+                        ''.join([' WHERE ', self._condition_parser(condition)]) if condition else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
         _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
@@ -245,19 +245,20 @@ class DictMySQLdb:
         :param where: Complex condition. {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, '>=': 1}, }
         """
         # TODO: make 'as' optional
+        # TODO: combine this method into select
         if not condition:
             condition = {}
 
         _args = self._condition_filter(condition)
         if where:
-            where_q, where_v = self._concat_complex_condition(where)
+            where_q, where_v = self._where_parser(where)
             _args += where_v
 
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'], ' ',
                         ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
                         ' WHERE ' if condition or where else '',
-                        self._concat_conditions(condition) if condition else '',
+                        self._condition_parser(condition) if condition else '',
                         ' AND ' if condition and where else '',
                         where_q if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
@@ -277,7 +278,7 @@ class DictMySQLdb:
                        would not work in this mode.
         """
         _sql = ''.join(['SELECT ', self._backtick(field), ' FROM ', self._backtick(tablename),
-                        ' WHERE ', self._concat_conditions(condition), ' LIMIT 1'])
+                        ' WHERE ', self._condition_parser(condition), ' LIMIT 1'])
         _args = self._condition_filter(condition)
         self.cur.execute(_sql, _args)
         ids = self.cur.fetchone()
@@ -293,8 +294,9 @@ class DictMySQLdb:
         """
         Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
         """
+        # TODO: join support
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._concat_values(value),
-                        ' WHERE ', self._concat_conditions(condition)])
+                        ' WHERE ', self._condition_parser(condition)])
         _args = tuple(value.values()) + self._condition_filter(condition)
         self.cur.execute(_sql, _args)
         if commit:
@@ -304,9 +306,11 @@ class DictMySQLdb:
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
-        _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._concat_conditions(condition)])
+        _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._condition_parser(condition)])
         _args = self._condition_filter(condition)
         return self.cur.execute(_sql, _args)
+
+    # TODO: CREATE method
 
     def now(self):
         self.cur.execute('SELECT NOW() as now;')
