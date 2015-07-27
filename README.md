@@ -1,7 +1,18 @@
 # DictMySQLdb [![Build Status](https://travis-ci.org/ligyxy/DictMySQLdb.svg?branch=master)](https://travis-ci.org/ligyxy/DictMySQLdb)
 A mysql package on the top of [MySQL-python](http://mysql-python.sourceforge.net/MySQLdb.html, "MySQL-python") or [PyMySQL](https://github.com/PyMySQL/PyMySQL, "PyMySQL") for more convenient database manipulation with Python dictionary. It uses MySQL-python for Python 2 and PyMySQL for Python 3 as connector.
 
-DictMySQLdb simplifies and unifies the input/output of MySQL queries for you, by allowing using dictionary to pass in values and conditions into MySQL.
+DictMySQLdb simplifies and unifies the input/output of MySQL queries for you, by allowing using dictionary to pass in values and conditions into MySQL. With DictCursor, you can even have a dict-in, dict-out db connector.
+
+```python
+from dictmysqldb import DictMySQLdb
+db = DictMySQLdb(db='occupation', host='127.0.0.1', passwd='', user='root')
+
+db.select(tablename='jobs', field=['id','value'], where={'$OR': [{'value': {'$=': 'Artist'}}, {'id': 10}]})
+```
+
+```sql
+SELECT `id`, `value` FROM `jobs` WHERE `id` = 10 OR `value` = "Artist";
+```
 
 Besides of the methods that MySQL-python or PyMySQL offers, DictMySQLdb provides the following methods:
 
