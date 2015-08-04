@@ -298,17 +298,21 @@ class DictMySQLdb:
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._concat_values(value),
                         ' WHERE ', self._condition_parser(condition)])
         _args = tuple(value.values()) + self._condition_filter(condition)
-        self.cur.execute(_sql, _args)
+        result = self.cur.execute(_sql, _args)
         if commit:
             self.commit()
+        return result
 
-    def delete(self, tablename, condition):
+    def delete(self, tablename, condition, commit=True):
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._condition_parser(condition)])
         _args = self._condition_filter(condition)
-        return self.cur.execute(_sql, _args)
+        result = self.cur.execute(_sql, _args)
+        if commit:
+            self.commit()
+        return result
 
     # TODO: CREATE method
 
