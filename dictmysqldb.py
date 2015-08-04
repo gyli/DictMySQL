@@ -248,13 +248,14 @@ class DictMySQLdb:
             tablename = self._backtick(tablename)
 
         # Format the key in join
-        join = [{k.lower(): v for k, v in j.iteritems()} for j in join]
+        if join:
+            join = [{k.lower(): v for k, v in j.iteritems()} for j in join]
 
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', tablename,
                         ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table']] +
                                            ['AS ' + t.get('as') if t.get('as') else ''] +
-                                           ['ON', t['on']]) for t in join]),
+                                           ['ON', t['on']]) for t in join]) if join else '',
                         ' WHERE ' if condition or where else '',
                         self._condition_parser(condition) if condition else '',
                         ' AND ' if condition and where else '',
