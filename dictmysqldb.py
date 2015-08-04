@@ -91,38 +91,52 @@ class DictMySQLdb:
             condition.append(self._backtick(v) + _cond)
         return ' AND '.join(condition)
 
-    def _where_parser(self, condition, placeholder='%s'):
-        """
-        Accept:
-        {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, 'IS': None}, }
-        {'OR': [{'LIKE': {'zipcode': '20009%'}}, {'value': {'<=': 5, 'IS': None}}]}
-        {'OR': {'AND': {'zipcode': {'LIKE': '20009%'}}, 'value': {'<=': 5, 'IS': None}, }}
-        {'value': {'AND': {'<=': 5, '>=': 2}}}
-
-        Return: "`id` = %s AND `name` = %s" and it also converts None value into 'IS NULL' in sql.
-        """
+    def _where_parser(self, where, placeholder='%s'):
         result = {'q': [], 'v': ()}
 
-        _operators = {'=', '<', '>', '<=', '>=', '<>', 'IS', 'LIKE', 'BETWEEN'}
+        _operators = {
+            '$=': '=',
+            '$EQ': '=',
+            '$<': '<',
+            '$LT': '<',
+            '$>': '>',
+            '$GT': '>',
+            '$<=': '<=',
+            '$LTE': '<=',
+            '$>=': '>=',
+            '$GTE': '>=',
+            '$<>': '<>',
+            '$NE': '<>',
+            '$IS': 'IS',
+            '$LIKE': 'LIKE',
+            '$BETWEEN': 'BETWEEN',
+            '$IN': 'IN',
+            '$NIN': 'NOT IN'
+        }
+
+        _connectors = {
+            '$AND': 'AND',
+            '$OR': 'OR'
+        }
 
         result = {'q': [], 'v': ()}
-        placeholder='%s'
+        placeholder = '%s'
 
         def _combining(_cond, _operator=None, upper_key=None, connector=None):
             # {'OR': [{'zipcode': {'<': '22}}]}
             if isinstance(_cond, dict):
                 i = 1
                 for k, v in _cond.iteritems():
-                    if k in {'$AND', '$OR'}:
-                        result['q'].append('( ')
-                        _combining(v, connector=k)
-                        result['q'].append(') ')
+                    if k.upper() in _connectors:
+                        result['q'].append('(')
+                        _combining(v, upper_key=upper_key, _operator=_operator, connector=_connectors[k.upper()])
+                        result['q'].append(')')
                     # {'>':{'value':10}}
-                    elif k in _operators:
-                        _combining(v, _operator=k, upper_key=upper_key)
+                    elif k.upper() in _operators:
+                        _combining(v, _operator=_operators[k.upper()], upper_key=upper_key, connector=connector)
                     # {'value':10}
                     else:
-                        _combining(v, upper_key=k, _operator=_operator)
+                        _combining(v, upper_key=k, _operator=_operator, connector=connector)
                     # default 'AND' except for the last one
                     if i < len(_cond):
                         result['q'].append(' AND ')
@@ -132,21 +146,17 @@ class DictMySQLdb:
                 for l in _cond:
                     _combining(l, _operator=_operator, upper_key=upper_key, connector=connector)
                     if l_index < len(_cond):
-                        result['q'].append(connector)
+                        result['q'].append(' ' + connector + ' ')
                     l_index += 1
             else:
                 if _operator:
-                    s_q = ' '.join([upper_key] + [_operator] + [placeholder])
+                    s_q = self._backtick(upper_key) + ' ' + _operator + ' ' + placeholder
                 else:
-                    s_q = ' '.join([upper_key] + ['='] + [placeholder])
-                result['q'].append(' (' + s_q + ') ')
+                    s_q = self._backtick(upper_key) + ' = ' + placeholder
+                result['q'].append('(' + s_q + ')')
+                result['v'] += (_cond,)
 
-# ' AND '.join([])
-# {'$AND': {'$OR': [{'>':{'value':10}, 'value2': 20}, {'value2': 20}], '$OR': [{'value3': 30}, {'value3': 30}]}
-#         # _combining({'OR': [{'<': {'zipcode': None}}, {'AND': [{'=':{'B':'2'}}, {'<':{'C': '3'}}]}]})
-#         _combining({'$OR': [{'$AND': [{'>': {'z1':222}}, {'<': {'z1':222}}]}, {'z3': {'>': 222}}]})
-        ''.join(result['q'])
-
+        _combining(where)
         return [''.join(result['q']), result['v']]
 
     @staticmethod
@@ -214,59 +224,46 @@ class DictMySQLdb:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def select(self, tablename, field, condition=None, insert=False, limit=0):
+    def select(self, tablename, field, join=None, condition=None, where=None, limit=0):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :param condition: The conditions of this query in a dict. value=None means no condition and returns everything.
         :param field: Put the fields you want to select in a list.
-        :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
         :type limit: int
         :param limit: The max row number you want to get from the query. Default is 0 which means no limit.
         """
-        _sql = ''.join(['SELECT ', self._backtick(field),
-                        ' FROM ', self._backtick(tablename),
-                        ''.join([' WHERE ', self._condition_parser(condition)]) if condition else '',
-                        ''.join([' LIMIT ', str(limit)]) if limit else ''])
-
-        _args = self._condition_filter(condition) if condition else ()  # If condition is None, select all rows
-        self.cur.execute(_sql, _args)
-        ids = self.cur.fetchall()
-        return ids if ids else (self.insert(tablename=tablename, value=condition) if insert else None)
-
-    def join_select(self, from_table, join_table, field, condition=None, where=None, limit=0):
-        """
-        Select values from joined tables.
-        :param from_table: {"table": "TableName", "as": "T"}
-        :param join_table: [{"table": "TableName2", "as": "T2", "on": "T2.id=T.t2_id", 'type': 'LEFT'}, ]
-                           type is optional.
-        :param field: ["T2.value", "T.value"]
-        :param condition: Simple where condition in the query, only support equal condition and AND operator.
-                          Example: {'value': 5, }
-        :param where: Complex condition. {'zipcode': {'LIKE': '20009%'}, 'value': {'<=': 5, '>=': 1}, }
-        """
-        # TODO: make 'as' optional
-        # TODO: combine this method into select
         if not condition:
             condition = {}
 
+        # Combine the arguments
         _args = self._condition_filter(condition)
         if where:
             where_q, where_v = self._where_parser(where)
             _args += where_v
 
+        # Concat the AS if there is
+        if isinstance(tablename, dict):
+            tablename = self._backtick(tablename['table']) + (' AS ' + tablename['as'] + ' ' if tablename['as'] else '')
+        else:
+            tablename = self._backtick(tablename)
+
+        # Format the key in join
+        join = [{k.lower(): v for k, v in j.iteritems()} for j in join]
+
         _sql = ''.join(['SELECT ', self._backtick(field),
-                        ' FROM ', self._backtick(from_table['table']), ' AS ', from_table['as'], ' ',
-                        ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table'], 'AS', t['as'], 'ON', t['on']]) for t in join_table]),
+                        ' FROM ', tablename,
+                        ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table']] +
+                                           ['AS ' + t.get('as') if t.get('as') else ''] +
+                                           ['ON', t['on']]) for t in join]),
                         ' WHERE ' if condition or where else '',
                         self._condition_parser(condition) if condition else '',
                         ' AND ' if condition and where else '',
                         where_q if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
-        print _sql
-
         self.cur.execute(_sql, _args)
-        return self.cur.fetchall()
+        ids = self.cur.fetchall()
+        return ids if ids else None
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
