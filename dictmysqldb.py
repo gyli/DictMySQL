@@ -263,8 +263,7 @@ class DictMySQLdb:
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
         self.cur.execute(_sql, _args)
-        ids = self.cur.fetchall()
-        return ids if ids else None
+        return self.cur.fetchall()
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
