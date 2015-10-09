@@ -248,13 +248,14 @@ class DictMySQLdb:
             tablename = self._backtick(tablename)
 
         # Format the key in join
-        join = [{k.lower(): v for k, v in j.iteritems()} for j in join]
+        if join:
+            join = [{k.lower(): v for k, v in j.iteritems()} for j in join]
 
         _sql = ''.join(['SELECT ', self._backtick(field),
                         ' FROM ', tablename,
                         ' '.join([' '.join([t.get('type', ''), 'JOIN', t['table']] +
                                            ['AS ' + t.get('as') if t.get('as') else ''] +
-                                           ['ON', t['on']]) for t in join]),
+                                           ['ON', t['on']]) for t in join]) if join else '',
                         ' WHERE ' if condition or where else '',
                         self._condition_parser(condition) if condition else '',
                         ' AND ' if condition and where else '',
@@ -262,8 +263,7 @@ class DictMySQLdb:
                         ''.join([' LIMIT ', str(limit)]) if limit else ''])
 
         self.cur.execute(_sql, _args)
-        ids = self.cur.fetchall()
-        return ids if ids else None
+        return self.cur.fetchall()
 
     def get(self, tablename, condition, field='id', insert=True, ifnone=None):
         """
@@ -295,17 +295,21 @@ class DictMySQLdb:
         _sql = ''.join(['UPDATE ', self._backtick(tablename), ' SET ', self._concat_values(value),
                         ' WHERE ', self._condition_parser(condition)])
         _args = tuple(value.values()) + self._condition_filter(condition)
-        self.cur.execute(_sql, _args)
+        result = self.cur.execute(_sql, _args)
         if commit:
             self.commit()
+        return result
 
-    def delete(self, tablename, condition):
+    def delete(self, tablename, condition, commit=True):
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         """
         _sql = ''.join(['DELETE FROM ', self._backtick(tablename), ' WHERE ', self._condition_parser(condition)])
         _args = self._condition_filter(condition)
-        return self.cur.execute(_sql, _args)
+        result = self.cur.execute(_sql, _args)
+        if commit:
+            self.commit()
+        return result
 
     # TODO: CREATE method
 
