@@ -15,7 +15,7 @@ here = path.abspath(path.dirname(__file__))
 setup(
     name='dictmysqldb',
 
-    version='0.3.4',
+    version='0.3.5',
 
     description='A mysql package on the top of MySQL-python for more convenient database manipulations with Python dictionary.',
 
@@ -35,7 +35,12 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3'
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.1',
+        'Programming Language :: Python :: 3.2',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5'
     ],
 
     keywords='mysql database',
