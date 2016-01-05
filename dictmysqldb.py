@@ -216,10 +216,15 @@ class DictMySQLdb:
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
-        ids = self.select(table=table, columns=[column], join=join, where=where, limit=1)[0]
+        select_result = self.select(table=table, columns=[column], join=join, where=where, limit=1)
 
-        if ids:
-            return ids[0 if self.cursorclass is pymysql.cursors.Cursor else column]
+        if self.debug:
+            return select_result
+        else:
+            result = select_result[0]
+
+        if result:
+            return result[0 if self.cursorclass is pymysql.cursors.Cursor else column]
         else:
             if ifnone:
                 raise ValueError(ifnone)
