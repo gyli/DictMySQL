@@ -169,8 +169,12 @@ class DictMySQLdb:
             raise TypeError('Input value should be a dictionary')
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._backtick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ')'])
+                        ' (', self._iterbacktick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ');'])
         _args = tuple(value.values())
+
+        if self.debug:
+            return _sql % _args
+
         self.cur.execute(_sql, _args)
         if commit:
             self.conn.commit()
@@ -187,9 +191,13 @@ class DictMySQLdb:
         if not isinstance(value, (list, tuple)):
             raise TypeError('Input value should be a list or tuple')
 
-        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', table,
-                        ' (', ', '.join(field), ') VALUES (', ', '.join(['%s'] * len(field)) + ')'])
+        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
+                        ' (', self._iterbacktick(field), ') VALUES (', ', '.join(['%s'] * len(field)), ');'])
         _args = tuple(value)
+
+        if self.debug:
+            return _sql % _args
+
         self.cur.executemany(_sql, _args)
         if commit:
             self.conn.commit()
@@ -204,14 +212,18 @@ class DictMySQLdb:
 
         _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick(value), ') VALUES ',
                         '(', ', '.join(['%s'] * len(value)), ') ',
-                        'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()])])
+                        'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()]), ';'])
         _args = tuple(value.values())
+
+        if self.debug:
+            return _sql % _args
+
         self.cur.execute(_sql, _args)
         if commit:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def select(self, table, columns, join=None, where=None, order=None, limit=0, debug=False):
+    def select(self, table, columns, join=None, where=None, order=None, limit=0):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
         :type table: string
@@ -234,9 +246,9 @@ class DictMySQLdb:
                         ' '.join([' '.join(['', self._tablename_parser(j_table)['join_type'], 'JOIN', self._tablename_parser(j_table)['formatted_tablename']] +
                                            ['ON', ' AND '.join(['='.join([o_k, o_v]) for o_k, o_v in j_on.items()])]) for j_table, j_on in join.items()]) if join else '',
                         ' WHERE ' + where_q if where else '',
-                        ''.join([' LIMIT ', str(limit)]) if limit else ''])
+                        ''.join([' LIMIT ', str(limit)]) if limit else '', ';'])
 
-        if debug:
+        if self.debug:
             return _sql % _args
 
         self.cur.execute(_sql, _args)
@@ -259,7 +271,11 @@ class DictMySQLdb:
             where_q = None
 
         _sql = ''.join(['SELECT ', self._backtick(column), ' FROM ', self._backtick(table),
-                        ' WHERE ' + where_q if where else '', ' LIMIT 1'])
+                        ' WHERE ' + where_q if where else '', ' LIMIT 1;'])
+
+        if self.debug:
+            return _sql % _args
+
         self.cur.execute(_sql, _args)
         ids = self.cur.fetchone()
         if ids:
@@ -286,7 +302,11 @@ class DictMySQLdb:
             where_q = None
 
         _sql = ''.join(['UPDATE ', self._backtick(table), ' SET ', self._concat_values(value),
-                        ' WHERE ' + where_q if where else ''])
+                        ' WHERE ' + where_q if where else '', ';'])
+
+        if self.debug:
+            return _sql % _args
+
         result = self.cur.execute(_sql, _args)
         if commit:
             self.commit()
@@ -302,7 +322,11 @@ class DictMySQLdb:
             where = {}
             _args = None
             where_q = None
-        _sql = ''.join(['DELETE FROM ', self._backtick(table), ' WHERE ' + where_q if where else ''])
+        _sql = ''.join(['DELETE FROM ', self._backtick(table), ' WHERE ' + where_q if where else '', ';'])
+
+        if self.debug:
+            return _sql % _args
+
         result = self.cur.execute(_sql, _args)
         if commit:
             self.commit()
@@ -311,12 +335,18 @@ class DictMySQLdb:
     # TODO: CREATE method
 
     def now(self):
-        self.cur.execute('SELECT NOW() as now;')
+        query = "SELECT NOW() as now;"
+        if self.debug:
+            return query
+        self.cur.execute(query)
         return self.cur.fetchone()[0 if self.cursorclass is pymysql.cursors.Cursor else 'now'].strftime(
                 "%Y-%m-%d %H:%M:%S")
 
     def last_insert_id(self):
-        self.query("SELECT LAST_INSERT_ID() AS lid")
+        query = "SELECT LAST_INSERT_ID() AS lid;"
+        if self.debug:
+            return query
+        self.query(query)
         return self.cur.fetchone()[0 if self.cursorclass is pymysql.cursors.Cursor else 'lid']
 
     def fetchone(self):
