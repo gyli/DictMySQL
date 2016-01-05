@@ -94,6 +94,7 @@ class DictMySQLdb:
         return ', '.join([' = '.join([self._backtick(v), placeholder]) for v in value])
 
     def _where_parser(self, where, placeholder='%s'):
+        # TODO: add function support in where
         result = {'q': [], 'v': ()}
 
         _operators = {
@@ -164,70 +165,6 @@ class DictMySQLdb:
         _combining(where)
         return ''.join(result['q']), result['v']
 
-    def insert(self, table, value, ignore=False, commit=True):
-        """
-        Insert a dict into db.
-        :return: int. The row id of the insert.
-        """
-        if not isinstance(value, dict):
-            raise TypeError('Input value should be a dictionary')
-
-        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._backtick_columns(value), ') VALUES (', ', '.join(['%s'] * len(value)), ');'])
-        _args = tuple(value.values())
-
-        if self.debug:
-            return _sql % _args
-
-        self.cur.execute(_sql, _args)
-        if commit:
-            self.conn.commit()
-        return self.cur.lastrowid
-
-    def insertmany(self, table, columns, value, ignore=False, commit=True):
-        """
-        Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
-        :type value: list
-        :param value: Example: [(value_1, value_2,), ].
-        :return: int. The row id of the LAST insert only.
-        """
-        if not isinstance(value, (list, tuple)):
-            raise TypeError('Input value should be a list or tuple')
-
-        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
-        _args = tuple(value)
-
-        if self.debug:
-            return _sql % _args
-
-        self.cur.executemany(_sql, _args)
-        if commit:
-            self.conn.commit()
-        return self.cur.lastrowid
-
-    def upsert(self, table, value, commit=True):
-        """
-        Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
-        """
-        if not isinstance(value, dict):
-            raise TypeError('Input value should be a dictionary')
-
-        # TODO: specify the columns
-        _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick(value), ') VALUES ',
-                        '(', ', '.join(['%s'] * len(value)), ') ',
-                        'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()]), ';'])
-        _args = tuple(value.values())
-
-        if self.debug:
-            return _sql % _args
-
-        self.cur.execute(_sql, _args)
-        if commit:
-            self.conn.commit()
-        return self.cur.lastrowid
-
     def select(self, table, columns, join=None, where=None, order=None, limit=0):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
@@ -292,6 +229,50 @@ class DictMySQLdb:
                 return self.insert(table=table, value=where)
         return None
 
+    def insert(self, table, value, ignore=False, commit=True):
+        """
+        Insert a dict into db.
+        :return: int. The row id of the insert.
+        """
+        # TODO: add function support in insert values
+        if not isinstance(value, dict):
+            raise TypeError('Input value should be a dictionary')
+
+        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
+                        ' (', self._backtick_columns(value), ') VALUES (', ', '.join(['%s'] * len(value)), ');'])
+        _args = tuple(value.values())
+
+        if self.debug:
+            return _sql % _args
+
+        self.cur.execute(_sql, _args)
+        if commit:
+            self.conn.commit()
+        return self.cur.lastrowid
+
+    def insertmany(self, table, columns, value, ignore=False, commit=True):
+        """
+        Insert multiple records within one query.
+        Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
+        :type value: list
+        :param value: Example: [(value_1, value_2,), ].
+        :return: int. The row id of the LAST insert only.
+        """
+        if not isinstance(value, (list, tuple)):
+            raise TypeError('Input value should be a list or tuple')
+
+        _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
+                        ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
+        _args = tuple(value)
+
+        if self.debug:
+            return _sql % _args
+
+        self.cur.executemany(_sql, _args)
+        if commit:
+            self.conn.commit()
+        return self.cur.lastrowid
+
     def update(self, table, value, where, commit=True):
         """
         Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
@@ -314,6 +295,31 @@ class DictMySQLdb:
         if commit:
             self.commit()
         return result
+
+    def upsert(self, table, value, update_columns=None, commit=True):
+        """
+        Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
+        :type update_columns: list
+        :param update_columns: specify the columns will be updated if record exists
+        """
+        if not isinstance(value, dict):
+            raise TypeError('Input value should be a dictionary')
+
+        if not update_columns:
+            update_columns = value.keys()
+
+        _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick(value), ') VALUES ',
+                        '(', ', '.join(['%s'] * len(value)), ') ',
+                        'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in update_columns]), ';'])
+        _args = tuple(value.values())
+
+        if self.debug:
+            return _sql % _args
+
+        self.cur.execute(_sql, _args)
+        if commit:
+            self.conn.commit()
+        return self.cur.lastrowid
 
     def delete(self, table, where, commit=True):
         """
