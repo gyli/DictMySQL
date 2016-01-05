@@ -51,19 +51,21 @@ class DictMySQLdb:
         return result
 
     @staticmethod
-    def _iterbacktick(value):
+    def _backtick_columns(cols):
         # backtick the former part when it meets the first dot, and then all the rest
         def bt(s):
-            return ['`' + s + '`'] if s else []
-        return ', '.join(['.'.join(bt(v.split('.')[0]) + bt('.'.join(v.split('.')[1:]))) for v in value])
+            if s == '*':
+                return ['*']
+            elif s:
+                return ['`' + s + '`']
+            else:
+                return []
+        return ', '.join(['.'.join(bt(v.split('.')[0]) + bt('.'.join(v.split('.')[1:]))) for v in cols])
 
     def _backtick(self, value):
-        return '*' if value == '*' else self._iterbacktick((value,))
+        return self._backtick_columns((value,))
 
     def _tablename_parser(self, table):
-        """
-        :return: (join_type, table_name, alias)
-        """
         result = re.match('^(\[(|>|<|<>|><)\])??(\w+)(\((|\w+)\))??$', table.replace(' ', ''))
         join_type = ''
         alias = ''
@@ -171,7 +173,7 @@ class DictMySQLdb:
             raise TypeError('Input value should be a dictionary')
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._iterbacktick(value), ') VALUES (', ', '.join(['%s'] * len(value)), ');'])
+                        ' (', self._backtick_columns(value), ') VALUES (', ', '.join(['%s'] * len(value)), ');'])
         _args = tuple(value.values())
 
         if self.debug:
@@ -194,7 +196,7 @@ class DictMySQLdb:
             raise TypeError('Input value should be a list or tuple')
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._iterbacktick(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
+                        ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
         _args = tuple(value)
 
         if self.debug:
@@ -255,7 +257,7 @@ class DictMySQLdb:
                                ' AND '.join(['='.join([self._backtick(o_k),
                                                        self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
 
-        _sql = ''.join(['SELECT ', self._iterbacktick(columns),
+        _sql = ''.join(['SELECT ', self._backtick_columns(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         join_q,
                         ' WHERE ' + where_q if where else '',
@@ -277,7 +279,6 @@ class DictMySQLdb:
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
-        # TODO: use 0 under dict cursor?
         ids = self.select(table=table, columns=[column], join=join, where=where, limit=1)[0]
 
         if ids:
