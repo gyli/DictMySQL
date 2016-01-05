@@ -39,10 +39,5 @@ setup(name='dictmysqldb',
 
       download_url='https://github.com/ligyxy/DictMySQLdb',
 
-      extras_require={
-          ':python_version=="2.7"': ["MySQL-python"],
-          ':python_version=="3.5"': ["PyMySQL"],
-          ':python_version=="3.4"': ["PyMySQL"],
-          ':python_version=="3.3"': ["PyMySQL"]
-      }
+      install_requires=['PyMySQL']
       )
