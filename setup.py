@@ -8,7 +8,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(name='dictmysqldb',
 
-      version='0.3.5',
+      version='1.0.0',
 
       description='A mysql package on the top of MySQL-python for more convenient database manipulations with Python dictionary.',
 

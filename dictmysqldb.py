@@ -52,11 +52,13 @@ class DictMySQLdb:
 
     @staticmethod
     def _iterbacktick(value):
-        # If there's a dot, only append the backticks to the first part
-        return '*' if value == '*' else ', '.join(['.'.join(['`' + v.split('.')[0] + '`'] + v.split('.')[1:]) for v in value])
+        # backtick the former part when it meets the first dot, and then all the rest
+        def bt(s):
+            return ['`' + s + '`'] if s else []
+        return ', '.join(['.'.join(bt(v.split('.')[0]) + bt('.'.join(v.split('.')[1:]))) for v in value])
 
     def _backtick(self, value):
-        return self._iterbacktick((value,))
+        return '*' if value == '*' else self._iterbacktick((value,))
 
     def _tablename_parser(self, table):
         """
@@ -180,10 +182,10 @@ class DictMySQLdb:
             self.conn.commit()
         return self.cur.lastrowid
 
-    def insertmany(self, table, field, value, ignore=False, commit=True):
+    def insertmany(self, table, columns, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', field=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
+        Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
         :type value: list
         :param value: Example: [(value_1, value_2,), ].
         :return: int. The row id of the LAST insert only.
@@ -192,7 +194,7 @@ class DictMySQLdb:
             raise TypeError('Input value should be a list or tuple')
 
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._iterbacktick(field), ') VALUES (', ', '.join(['%s'] * len(field)), ');'])
+                        ' (', self._iterbacktick(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
         _args = tuple(value)
 
         if self.debug:
@@ -210,6 +212,7 @@ class DictMySQLdb:
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
 
+        # TODO: specify the columns
         _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick(value), ') VALUES ',
                         '(', ', '.join(['%s'] * len(value)), ') ',
                         'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in value.keys()]), ';'])
@@ -225,7 +228,7 @@ class DictMySQLdb:
 
     def select(self, table, columns, join=None, where=None, order=None, limit=0):
         """
-        Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, field=['id','value'])
+        Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
         :type table: string
         :type columns: list
         :type join: dict
@@ -241,10 +244,20 @@ class DictMySQLdb:
             _args = None
             where_q = None
 
+        join_q = ''
+        if join:
+            for j_table, j_on in join.items():
+                join_table = self._tablename_parser(j_table)
+                join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
+                                   join_table['formatted_tablename'],
+                                   ' ON ',
+                                   ' AND '.join(['='.join([self._backtick(o_k),
+                                                           self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
+
+        # TODO: avoid the multiple _tablename_parser
         _sql = ''.join(['SELECT ', self._iterbacktick(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
-                        ' '.join([' '.join(['', self._tablename_parser(j_table)['join_type'], 'JOIN', self._tablename_parser(j_table)['formatted_tablename']] +
-                                           ['ON', ' AND '.join(['='.join([o_k, o_v]) for o_k, o_v in j_on.items()])]) for j_table, j_on in join.items()]) if join else '',
+                        join_q,
                         ' WHERE ' + where_q if where else '',
                         ''.join([' LIMIT ', str(limit)]) if limit else '', ';'])
 
@@ -254,15 +267,17 @@ class DictMySQLdb:
         self.cur.execute(_sql, _args)
         return self.cur.fetchall()
 
-    def get(self, table, where, column='id', insert=False, ifnone=None):
+    def get(self, table, column, where, insert=False, ifnone=None):
         """
-        A simplified method of select, for getting the first result in one field only. A common case of using this
+        A simplified method of select, for getting the first result in one column only. A common case of using this
         method is getting id.
-        Example: db.get(tablename='jobs', condition={'id': 2}, field='value').
+        Example: db.get(tablename='jobs', condition={'id': 2}, column='value').
+        :type column: str
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
+        # TODO: use select function
         if where:
             where_q, _args = self._where_parser(where)
         else:
@@ -331,8 +346,6 @@ class DictMySQLdb:
         if commit:
             self.commit()
         return result
-
-    # TODO: CREATE method
 
     def now(self):
         query = "SELECT NOW() as now;"
