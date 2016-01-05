@@ -245,16 +245,16 @@ class DictMySQLdb:
             where_q = None
 
         join_q = ''
-        if join:
-            for j_table, j_on in join.items():
-                join_table = self._tablename_parser(j_table)
-                join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
-                                   join_table['formatted_tablename'],
-                                   ' ON ',
-                                   ' AND '.join(['='.join([self._backtick(o_k),
-                                                           self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
+        if not join:
+            join = {}
+        for j_table, j_on in join.items():
+            join_table = self._tablename_parser(j_table)
+            join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
+                               join_table['formatted_tablename'],
+                               ' ON ',
+                               ' AND '.join(['='.join([self._backtick(o_k),
+                                                       self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
 
-        # TODO: avoid the multiple _tablename_parser
         _sql = ''.join(['SELECT ', self._iterbacktick(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         join_q,
@@ -267,7 +267,7 @@ class DictMySQLdb:
         self.cur.execute(_sql, _args)
         return self.cur.fetchall()
 
-    def get(self, table, column, where, insert=False, ifnone=None):
+    def get(self, table, column, join=None, where=None, insert=False, ifnone=None):
         """
         A simplified method of select, for getting the first result in one column only. A common case of using this
         method is getting id.
@@ -277,22 +277,9 @@ class DictMySQLdb:
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
-        # TODO: use select function
-        if where:
-            where_q, _args = self._where_parser(where)
-        else:
-            where = {}
-            _args = None
-            where_q = None
+        # TODO: use 0 under dict cursor?
+        ids = self.select(table=table, columns=[column], join=join, where=where, limit=1)[0]
 
-        _sql = ''.join(['SELECT ', self._backtick(column), ' FROM ', self._backtick(table),
-                        ' WHERE ' + where_q if where else '', ' LIMIT 1;'])
-
-        if self.debug:
-            return _sql % _args
-
-        self.cur.execute(_sql, _args)
-        ids = self.cur.fetchone()
         if ids:
             return ids[0 if self.cursorclass is pymysql.cursors.Cursor else column]
         else:
@@ -300,7 +287,7 @@ class DictMySQLdb:
                 raise ValueError(ifnone)
             if insert:
                 if any([isinstance(d, dict) for d in where.values()]):
-                    raise ValueError("The where parameter in get() doesn't support nested condition.")
+                    raise ValueError("The where parameter in get() doesn't support nested condition with insert==True.")
                 return self.insert(table=table, value=where)
         return None
 
@@ -348,7 +335,7 @@ class DictMySQLdb:
         return result
 
     def now(self):
-        query = "SELECT NOW() as now;"
+        query = "SELECT NOW() AS now;"
         if self.debug:
             return query
         self.cur.execute(query)
