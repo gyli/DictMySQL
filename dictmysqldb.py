@@ -111,10 +111,9 @@ class DictMySQLdb:
             '$<>': '<>',
             '$NE': '<>',
             '$IS': 'IS',
-            '$LIKE': 'LIKE'
-            # '$BETWEEN': 'BETWEEN',
-            # '$IN': 'IN',
-            # '$NIN': 'NOT IN'
+            '$LIKE': 'LIKE',
+            '$BETWEEN': 'BETWEEN',
+            '$IN': 'IN'
         }
 
         _connectors = {
@@ -122,43 +121,79 @@ class DictMySQLdb:
             '$OR': 'OR'
         }
 
+        negative_symbol = {
+            '=': '<>',
+            '<': '>=',
+            '>': '<=',
+            '<=': '>',
+            '>=': '<',
+            '<>': '=',
+            'LIKE': 'NOT LIKE',
+            'BETWEEN': 'NOT BETWEEN',
+            'IN': 'NOT IN',
+            'AND': 'OR',
+            'OR': 'AND'
+        }
+
+        def _get_connector(c, is_not, space=False):
+            c = c or '='
+            c = negative_symbol.get(c) if is_not else c
+            return ' ' + c + ' ' if space else c
+
         result = {'q': [], 'v': ()}
         placeholder = '%s'
 
-        def _combining(_cond, _operator=None, upper_key=None, connector=None):
-            # {'OR': [{'zipcode': {'<': '22}}]}
+        def _combining(_cond, _operator=None, upper_key=None, connector=None, _not=False):
             if isinstance(_cond, dict):
                 i = 1
                 for k, v in _cond.items():
+                    # {'$AND':{'value':10}}
                     if k.upper() in _connectors:
                         result['q'].append('(')
-                        _combining(v, upper_key=upper_key, _operator=_operator, connector=_connectors[k.upper()])
+                        _combining(v, upper_key=upper_key, _operator=_operator, connector=_connectors[k.upper()], _not=_not)
                         result['q'].append(')')
                     # {'>':{'value':10}}
                     elif k.upper() in _operators:
-                        _combining(v, _operator=_operators[k.upper()], upper_key=upper_key, connector=connector)
+                        _combining(v, _operator=_operators[k.upper()], upper_key=upper_key, connector=connector, _not=_not)
+                    # {'value':10}
+                    elif k.upper() == '$NOT':
+                        _combining(v, upper_key=upper_key, _operator=_operator, connector=connector, _not=not _not)
                     # {'value':10}
                     else:
-                        _combining(v, upper_key=k, _operator=_operator, connector=connector)
+                        _combining(v, upper_key=k, _operator=_operator, connector=connector, _not=_not)
                     # default 'AND' except for the last one
                     if i < len(_cond):
-                        result['q'].append(' AND ')
+                        result['q'].append(_get_connector('AND', is_not=_not, space=True))
                     i += 1
+
             elif isinstance(_cond, list):
-                l_index = 1
-                for l in _cond:
-                    _combining(l, _operator=_operator, upper_key=upper_key, connector=connector)
-                    if l_index < len(_cond):
-                        result['q'].append(' ' + connector + ' ')
-                    l_index += 1
+                # [{'age': {'$>': 22}}, {'amount': {'$<': 100}}]
+                if all(isinstance(c, dict) for c in _cond):
+                    l_index = 1
+                    for l in _cond:
+                        _combining(l, _operator=_operator, upper_key=upper_key, connector=connector, _not=_not)
+                        if l_index < len(_cond):
+                            result['q'].append(_get_connector(connector, is_not=_not, space=True))
+                        l_index += 1
+                elif _operator in ['=', '$IN'] or not _operator:
+                    s_q = self._backtick(upper_key) + (' NOT' if _not else '') + ' IN (' + ', '.join(['%s']*len(_cond)) + ')'
+                    result['q'].append('(' + s_q + ')')
+                    result['v'] += tuple(_cond)
+                elif _operator == 'BETWEEN':
+                    s_q = self._backtick(upper_key) + (' NOT' if _not else '') + ' BETWEEN ' + ' AND '.join(['%s']*len(_cond))
+                    result['q'].append('(' + s_q + ')')
+                    result['v'] += tuple(_cond)
+                elif _operator == 'LIKE':
+                    s_q = ' OR '.join(['(' + self._backtick(upper_key) + (' NOT' if _not else '') + ' LIKE %s)'] * len(_cond))
+                    result['q'].append('(' + s_q + ')')
+                    result['v'] += tuple(_cond)
+                # if keyword not in prefilled list but value is not dict also, should return error
+
             elif not _cond:
-                s_q = self._backtick(upper_key) + ' IS NULL '
+                s_q = self._backtick(upper_key) + ' IS' + (' NOT' if _not else '') + ' NULL'
                 result['q'].append('(' + s_q + ')')
             else:
-                if _operator:
-                    s_q = self._backtick(upper_key) + ' ' + _operator + ' ' + placeholder
-                else:
-                    s_q = self._backtick(upper_key) + ' = ' + placeholder
+                s_q = ' '.join([self._backtick(upper_key), _get_connector(_operator, is_not=_not), placeholder])
                 result['q'].append('(' + s_q + ')')
                 result['v'] += (_cond,)
 
