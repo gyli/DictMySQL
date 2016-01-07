@@ -110,7 +110,6 @@ class DictMySQLdb:
             '$GTE': '>=',
             '$<>': '<>',
             '$NE': '<>',
-            '$IS': 'IS',
             '$LIKE': 'LIKE',
             '$BETWEEN': 'BETWEEN',
             '$IN': 'IN'
@@ -200,7 +199,17 @@ class DictMySQLdb:
         _combining(where)
         return ''.join(result['q']), result['v']
 
-    def select(self, table, columns, join=None, where=None, order=None, limit=0):
+    @staticmethod
+    def _limit_parser(limit=None):
+        if isinstance(limit, list) and len(limit) == 2:
+            return ' '.join([' LIMIT', ', '.join(limit)])
+        elif str(limit).isnumeric():
+            return ' '.join([' LIMIT', str(limit)])
+        else:
+            return ''
+
+    def select(self, table, columns, join=None, where=None, order=None, limit=None):
+        # TODO: limit could be multiple numbers?
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
         :type table: string
@@ -233,7 +242,7 @@ class DictMySQLdb:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         join_q,
                         ' WHERE ' + where_q if where else '',
-                        ''.join([' LIMIT ', str(limit)]) if limit else '', ';'])
+                        self._limit_parser(limit), ';'])
 
         if self.debug:
             return _sql % _args
