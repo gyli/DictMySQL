@@ -197,19 +197,23 @@ class DictMySQLdb:
                 result['v'] += (_cond,)
 
         _combining(where)
-        return ''.join(result['q']), result['v']
+        # TODO: move the WHERE keyword here
+        return ' WHERE ' + ''.join(result['q']), result['v']
 
     @staticmethod
     def _limit_parser(limit=None):
         if isinstance(limit, list) and len(limit) == 2:
-            return ' '.join([' LIMIT', ', '.join(limit)])
+            return ' '.join((' LIMIT', ', '.join(str(l) for l in limit)))
         elif str(limit).isnumeric():
-            return ' '.join([' LIMIT', str(limit)])
+            return ' '.join((' LIMIT', str(limit)))
         else:
             return ''
 
+    @staticmethod
+    def _whitespace_decorator(s, p=True, n=False):
+        return ''.join((' ' if p else '', s, ' ' if n else ''))
+
     def select(self, table, columns, join=None, where=None, order=None, limit=None):
-        # TODO: limit could be multiple numbers?
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
         :type table: string
@@ -217,15 +221,14 @@ class DictMySQLdb:
         :type join: dict
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}}
         :type where: dict
-        :type limit: int
-        :param limit: The max row number you want to get from the query. Default is 0 which means no limit.
+        :type limit: int|list
+        :param limit: The max row number you want to get from the query.
         """
         if where:
             where_q, _args = self._where_parser(where)
         else:
-            where = {}
             _args = None
-            where_q = None
+            where_q = ''
 
         join_q = ''
         if not join:
@@ -241,7 +244,8 @@ class DictMySQLdb:
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         join_q,
-                        ' WHERE ' + where_q if where else '',
+                        where_q,
+                        self._whitespace_decorator(order) if order else '',
                         self._limit_parser(limit), ';'])
 
         if self.debug:
@@ -330,12 +334,12 @@ class DictMySQLdb:
         if where:
             where_q, _args = self._where_parser(where)
         else:
-            where = {}
             _args = None
-            where_q = None
+            where_q = ''
 
-        _sql = ''.join(['UPDATE ', self._backtick(table), ' SET ', self._concat_values(value),
-                        ' WHERE ' + where_q if where else '', ';'])
+        _sql = ''.join(['UPDATE ', self._backtick(table),
+                        ' SET ', self._concat_values(value),
+                        where_q, ';'])
 
         if self.debug:
             return _sql % _args
@@ -377,10 +381,9 @@ class DictMySQLdb:
         if where:
             where_q, _args = self._where_parser(where)
         else:
-            where = {}
             _args = None
-            where_q = None
-        _sql = ''.join(['DELETE FROM ', self._backtick(table), ' WHERE ' + where_q if where else '', ';'])
+            where_q = ''
+        _sql = ''.join(['DELETE FROM ', self._backtick(table), where_q, ';'])
 
         if self.debug:
             return _sql % _args
