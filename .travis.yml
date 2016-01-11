@@ -1,13 +1,13 @@
 language: python
 python:
     - "2.7"
-    - "3.3"
+    - "3.5"
 install:
-    - if [ "${PYTHON}" == "3.4" ]; then
+    - if [ "${PYTHON}" == "3.5" ]; then
           pip3 install PyMySQL;
       fi;
     - if [ "${PYTHON}" == "2.7" ]; then
-          pip install MySQL-python;
+          pip install PyMySQL;
       fi;
 script:
     - python setup.py test
