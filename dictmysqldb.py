@@ -139,10 +139,10 @@ class DictMySQLdb:
             'OR': 'AND'
         }
 
-        def _get_connector(c, is_not, whitespace=False):
+        def _get_connector(c, is_not, space=False):
             c = c or '='
             c = negative_symbol.get(c) if is_not else c
-            return ' ' + c + ' ' if whitespace else c
+            return ' ' + c + ' ' if space else c
 
         result = {'q': [], 'v': ()}
         placeholder = '%s'
@@ -159,7 +159,7 @@ class DictMySQLdb:
                     # {'>':{'value':10}}
                     elif k.upper() in _operators:
                         _combining(v, _operator=_operators[k.upper()], upper_key=upper_key, connector=connector, _not=_not)
-                    # negative
+                    # {'value':10}
                     elif k.upper() == '$NOT':
                         _combining(v, upper_key=upper_key, _operator=_operator, connector=connector, _not=not _not)
                     # {'value':10}
@@ -167,7 +167,7 @@ class DictMySQLdb:
                         _combining(v, upper_key=k, _operator=_operator, connector=connector, _not=_not)
                     # default 'AND' except for the last one
                     if i < len(_cond):
-                        result['q'].append(_get_connector('AND', is_not=_not, whitespace=True))
+                        result['q'].append(_get_connector('AND', is_not=_not, space=True))
                     i += 1
 
             elif isinstance(_cond, list):
@@ -177,7 +177,7 @@ class DictMySQLdb:
                     for l in _cond:
                         _combining(l, _operator=_operator, upper_key=upper_key, connector=connector, _not=_not)
                         if l_index < len(_cond):
-                            result['q'].append(_get_connector(connector, is_not=_not, whitespace=True))
+                            result['q'].append(_get_connector(connector, is_not=_not, space=True))
                         l_index += 1
                 elif _operator in ['=', '$IN'] or not _operator:
                     s_q = self._backtick(upper_key) + (' NOT' if _not else '') + ' IN (' + ', '.join(['%s']*len(_cond)) + ')'
