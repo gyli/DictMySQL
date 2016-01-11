@@ -209,7 +209,7 @@ class DictMySQLdb:
     def _limit_parser(limit=None):
         if isinstance(limit, list) and len(limit) == 2:
             return ' '.join((' LIMIT', ', '.join(str(l) for l in limit)))
-        elif str(limit).isnumeric():
+        elif limit.isdigit():
             return ' '.join((' LIMIT', str(limit)))
         else:
             return ''
