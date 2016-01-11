@@ -249,19 +249,22 @@ class DictMySQLdb:
         else:
             return ''
 
-    def select(self, table, columns, join=None, where=None, order=None, limit=None):
+    def select(self, table, columns=None, join=None, where=None, order=None, limit=None):
         # TODO: Support of *, and make it as default value
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
-        :type table: basestring
+        :type table: string
         :type columns: list
         :type join: dict
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}}
         :type where: dict
-        :type order: basestring
+        :type order: string
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
         """
+        if not columns:
+            columns = ['*']
+
         where_q, _args = self._where_parser(where)
 
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
@@ -282,13 +285,13 @@ class DictMySQLdb:
         A simplified method of select, for getting the first result in one column only. A common case of using this
         method is getting id.
         Example: db.get(tablename='jobs', condition={'id': 2}, column='value').
-        :type table: basestring
+        :type table: string
         :type column: str
         :type join: dict
         :type where: dict
         :type insert: bool
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
-        :type ifnone: basestring
+        :type ifnone: string
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
@@ -313,7 +316,7 @@ class DictMySQLdb:
     def insert(self, table, value, ignore=False, commit=True):
         """
         Insert a dict into db.
-        :type table: basestring
+        :type table: string
         :type value: dict
         :type ignore: bool
         :type commit: bool
@@ -335,7 +338,7 @@ class DictMySQLdb:
     def upsert(self, table, value, update_columns=None, commit=True):
         """
         Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
-        :type table: basestring
+        :type table: string
         :type value: dict
         :type update_columns: list
         :param update_columns: specify the columns will be updated if record exists
@@ -365,7 +368,7 @@ class DictMySQLdb:
         """
         Insert multiple records within one query.
         Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
-        :type table: basestring
+        :type table: string
         :type columns: list
         :type value: list|tuple
         :param value: Doesn't support MySQL functions
@@ -392,7 +395,7 @@ class DictMySQLdb:
     def update(self, table, value, where, commit=True):
         """
         Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
-        :type table: basestring
+        :type table: string
         :type value: dict
         :type where: dict
         :type commit: bool
@@ -417,7 +420,7 @@ class DictMySQLdb:
     def delete(self, table, where, commit=True):
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
-        :type table: basestring
+        :type table: string
         :type where: dict
         :type commit: bool
         """
