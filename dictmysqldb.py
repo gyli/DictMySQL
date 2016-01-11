@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*-coding:UTF-8 -*-
 
+from __future__ import print_function
 import pymysql
 import pymysql.cursors
 import re
@@ -95,6 +96,10 @@ class DictMySQLdb:
 
     def _where_parser(self, where, placeholder='%s'):
         # TODO: add function support in where
+
+        if not where:
+            return '', ()
+
         result = {'q': [], 'v': ()}
 
         _operators = {
