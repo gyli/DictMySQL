@@ -66,6 +66,10 @@ class DictMySQLdb:
     def _backtick(self, value):
         return self._backtick_columns((value,))
 
+    @staticmethod
+    def _whitespace_decorator(s, p=True, n=False):
+        return ''.join((' ' if p else '', s, ' ' if n else ''))
+
     def _tablename_parser(self, table):
         result = re.match('^(\[(|>|<|<>|><)\])??(\w+)(\((|\w+)\))??$', table.replace(' ', ''))
         join_type = ''
@@ -93,6 +97,20 @@ class DictMySQLdb:
         Return "`id` = %s, `name` = %s". Only used in update(), no need to convert NULL values.
         """
         return ', '.join([' = '.join([self._backtick(v), placeholder]) for v in value])
+
+    def _join_parser(self, join):
+        if not join:
+            return ''
+
+        join_q = ''
+        for j_table, j_on in join.items():
+            join_table = self._tablename_parser(j_table)
+            join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
+                               join_table['formatted_tablename'],
+                               ' ON ',
+                               ' AND '.join(['='.join([self._backtick(o_k),
+                                                       self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
+        return join_q
 
     def _where_parser(self, where, placeholder='%s'):
         # TODO: add function support in where
@@ -202,7 +220,6 @@ class DictMySQLdb:
                 result['v'] += (_cond,)
 
         _combining(where)
-        # TODO: move the WHERE keyword here
         return ' WHERE ' + ''.join(result['q']), result['v']
 
     @staticmethod
@@ -213,10 +230,6 @@ class DictMySQLdb:
             return ' '.join((' LIMIT', str(limit)))
         else:
             return ''
-
-    @staticmethod
-    def _whitespace_decorator(s, p=True, n=False):
-        return ''.join((' ' if p else '', s, ' ' if n else ''))
 
     def select(self, table, columns, join=None, where=None, order=None, limit=None):
         """
@@ -232,20 +245,9 @@ class DictMySQLdb:
         """
         where_q, _args = self._where_parser(where)
 
-        join_q = ''
-        if not join:
-            join = {}
-        for j_table, j_on in join.items():
-            join_table = self._tablename_parser(j_table)
-            join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
-                               join_table['formatted_tablename'],
-                               ' ON ',
-                               ' AND '.join(['='.join([self._backtick(o_k),
-                                                       self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
-
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
-                        join_q,
+                        self._join_parser(join),
                         where_q,
                         self._whitespace_decorator(order) if order else '',
                         self._limit_parser(limit), ';'])
