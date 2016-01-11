@@ -139,10 +139,10 @@ class DictMySQLdb:
             'OR': 'AND'
         }
 
-        def _get_connector(c, is_not, space=False):
+        def _get_connector(c, is_not, whitespace=False):
             c = c or '='
             c = negative_symbol.get(c) if is_not else c
-            return ' ' + c + ' ' if space else c
+            return ' ' + c + ' ' if whitespace else c
 
         result = {'q': [], 'v': ()}
         placeholder = '%s'
@@ -167,7 +167,7 @@ class DictMySQLdb:
                         _combining(v, upper_key=k, _operator=_operator, connector=connector, _not=_not)
                     # default 'AND' except for the last one
                     if i < len(_cond):
-                        result['q'].append(_get_connector('AND', is_not=_not, space=True))
+                        result['q'].append(_get_connector('AND', is_not=_not, whitespace=True))
                     i += 1
 
             elif isinstance(_cond, list):
@@ -177,7 +177,7 @@ class DictMySQLdb:
                     for l in _cond:
                         _combining(l, _operator=_operator, upper_key=upper_key, connector=connector, _not=_not)
                         if l_index < len(_cond):
-                            result['q'].append(_get_connector(connector, is_not=_not, space=True))
+                            result['q'].append(_get_connector(connector, is_not=_not, whitespace=True))
                         l_index += 1
                 elif _operator in ['=', '$IN'] or not _operator:
                     s_q = self._backtick(upper_key) + (' NOT' if _not else '') + ' IN (' + ', '.join(['%s']*len(_cond)) + ')'
@@ -221,19 +221,16 @@ class DictMySQLdb:
     def select(self, table, columns, join=None, where=None, order=None, limit=None):
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
-        :type table: string
+        :type table: basestring
         :type columns: list
         :type join: dict
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}}
         :type where: dict
+        :type order: basestring
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
         """
-        if where:
-            where_q, _args = self._where_parser(where)
-        else:
-            _args = None
-            where_q = ''
+        where_q, _args = self._where_parser(where)
 
         join_q = ''
         if not join:
@@ -264,8 +261,13 @@ class DictMySQLdb:
         A simplified method of select, for getting the first result in one column only. A common case of using this
         method is getting id.
         Example: db.get(tablename='jobs', condition={'id': 2}, column='value').
+        :type table: basestring
         :type column: str
+        :type join: dict
+        :type where: dict
+        :type insert: bool
         :param insert: If insert==True, insert the input condition if there's no result and return the id of new row.
+        :type ifnone: basestring
         :param ifnone: When ifnone is a non-empty string, raise an error if query returns empty result. insert parameter
                        would not work in this mode.
         """
@@ -290,6 +292,10 @@ class DictMySQLdb:
     def insert(self, table, value, ignore=False, commit=True):
         """
         Insert a dict into db.
+        :type table: basestring
+        :type value: dict
+        :type ignore: bool
+        :type commit: bool
         :return: int. The row id of the insert.
         """
         # TODO: add function support in insert values
@@ -312,8 +318,12 @@ class DictMySQLdb:
         """
         Insert multiple records within one query.
         Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
+        :type table: basestring
+        :type columns: list
         :type value: list
-        :param value: Example: [(value_1, value_2,), ].
+        :param value: Example: [(value1_column1, value1_column2,), ]
+        :type ignore: bool
+        :type commit: bool
         :return: int. The row id of the LAST insert only.
         """
         if not isinstance(value, (list, tuple)):
@@ -334,17 +344,15 @@ class DictMySQLdb:
     def update(self, table, value, where, commit=True):
         """
         Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
+        :type table: basestring
+        :type value: dict
+        :type where: dict
+        :type commit: bool
         """
         # TODO: join support
-        if where:
-            where_q, _args = self._where_parser(where)
-        else:
-            _args = None
-            where_q = ''
+        where_q, _args = self._where_parser(where)
 
-        _sql = ''.join(['UPDATE ', self._backtick(table),
-                        ' SET ', self._concat_values(value),
-                        where_q, ';'])
+        _sql = ''.join(['UPDATE ', self._backtick(table), ' SET ', self._concat_values(value), where_q, ';'])
 
         if self.debug:
             return _sql % _args
@@ -357,8 +365,11 @@ class DictMySQLdb:
     def upsert(self, table, value, update_columns=None, commit=True):
         """
         Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
+        :type table: basestring
+        :type value: dict
         :type update_columns: list
         :param update_columns: specify the columns will be updated if record exists
+        :type commit: bool
         """
         if not isinstance(value, dict):
             raise TypeError('Input value should be a dictionary')
@@ -382,12 +393,12 @@ class DictMySQLdb:
     def delete(self, table, where, commit=True):
         """
         Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
+        :type table: basestring
+        :type where: dict
+        :type commit: bool
         """
-        if where:
-            where_q, _args = self._where_parser(where)
-        else:
-            _args = None
-            where_q = ''
+        where_q, _args = self._where_parser(where)
+
         _sql = ''.join(['DELETE FROM ', self._backtick(table), where_q, ';'])
 
         if self.debug:
