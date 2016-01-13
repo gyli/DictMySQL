@@ -113,7 +113,7 @@ class DictMySQLdb:
             q.append(' = '.join([self._backtick(k), item_value]) if columnname else item_value)
             if not is_function:
                 a.append(v)
-        return ', '.join(q), a
+        return ', '.join(q), tuple(a)
 
     def _join_parser(self, join):
         if not join:
@@ -250,7 +250,6 @@ class DictMySQLdb:
             return ''
 
     def select(self, table, columns=None, join=None, where=None, order=None, limit=None):
-        # TODO: Support of *, and make it as default value
         """
         Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
         :type table: string
