@@ -36,7 +36,7 @@ setup(name='dictmysql',
 
       keywords='python mysql class',
 
-      download_url='https://github.com/ligyxy/DictMySQLdb',
+      download_url='https://github.com/ligyxy/DictMySQL',
 
       install_requires=["PyMySQL>=0.7"],
       )
