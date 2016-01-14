@@ -6,11 +6,11 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-setup(name='dictmysqldb',
+setup(name='dictmysql',
 
       version='0.4.1',
 
-      description='A mysql package on the top of MySQL-python for more convenient database manipulations with Python dictionary.',
+      description='A mysql class for more convenient database manipulations with Python dictionary.',
 
       author='Guangyang Li',
 
@@ -18,7 +18,7 @@ setup(name='dictmysqldb',
 
       license='MIT',
 
-      py_modules=['dictmysqldb'],
+      py_modules=['dictmysql'],
 
       classifiers=[
           'Development Status :: 5 - Production/Stable',
@@ -34,7 +34,7 @@ setup(name='dictmysqldb',
           'Programming Language :: Python :: 3.5'
       ],
 
-      keywords='mysql database',
+      keywords='python mysql class',
 
       download_url='https://github.com/ligyxy/DictMySQLdb',
 
