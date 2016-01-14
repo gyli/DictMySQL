@@ -1,5 +1,7 @@
 # DictMySQL [![Build Status](https://travis-ci.org/ligyxy/DictMySQL.svg?branch=master)](https://travis-ci.org/ligyxy/DictMySQL)
-PyPI page: [https://pypi.python.org/pypi?:action=display&name=dictmysql](https://pypi.python.org/pypi?:action=display&name=dictmysql)
+
+PyPI page: [https://pypi.python.org/pypi/dictmysql](https://pypi.python.org/pypi/dictmysql)
+
 Documents: [https://ligyxy.github.io/DictMySQL](https://ligyxy.github.io/DictMySQL)
 
 ## Introduction
