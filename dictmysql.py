@@ -251,7 +251,6 @@ class DictMySQL:
 
     def select(self, table, columns=None, join=None, where=None, order=None, limit=None):
         """
-        Example: db.select(tablename='jobs', condition={'id': (2, 3), 'sanitized': None}, columns=['id','value'])
         :type table: string
         :type columns: list
         :type join: dict
@@ -283,7 +282,6 @@ class DictMySQL:
         """
         A simplified method of select, for getting the first result in one column only. A common case of using this
         method is getting id.
-        Example: db.get(tablename='jobs', condition={'id': 2}, column='value').
         :type table: string
         :type column: str
         :type join: dict
@@ -336,7 +334,6 @@ class DictMySQL:
 
     def upsert(self, table, value, update_columns=None, commit=True):
         """
-        Example: db.upsert(tablename='jobs', value={'id': 3, 'value': 'MECHANIC'}).
         :type table: string
         :type value: dict
         :type update_columns: list
@@ -366,7 +363,6 @@ class DictMySQL:
     def insertmany(self, table, columns, value, ignore=False, commit=True):
         """
         Insert multiple records within one query.
-        Example: db.insertmany(tablename='jobs', columns=['id', 'value'], value=[('5', 'TEACHER'), ('6', 'MANAGER')]).
         :type table: string
         :type columns: list
         :type value: list|tuple
@@ -393,7 +389,6 @@ class DictMySQL:
 
     def update(self, table, value, where, commit=True):
         """
-        Example: db.update(tablename='jobs', value={'value': 'MECHANIC'}, condition={'id': 3}).
         :type table: string
         :type value: dict
         :type where: dict
@@ -418,7 +413,6 @@ class DictMySQL:
 
     def delete(self, table, where, commit=True):
         """
-        Example: db.delete(tablename='jobs', condition={'value': ('FACULTY', 'MECHANIC'), 'sanitized': None}).
         :type table: string
         :type where: dict
         :type commit: bool
