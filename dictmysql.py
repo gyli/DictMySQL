@@ -255,7 +255,7 @@ class DictMySQL:
         :type table: string
         :type columns: list
         :type join: dict
-        :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}}
+        :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}} -> "LEFT JOIN table AS t1 ON user.id = t1.user_id"
         :type where: dict
         :type order: string
         :type limit: int|list

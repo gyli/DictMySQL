@@ -8,7 +8,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(name='dictmysql',
 
-      version='0.4.1',
+      version='0.4.2',
 
       description='A mysql class for more convenient database manipulations with Python dictionary.',
 
@@ -36,7 +36,7 @@ setup(name='dictmysql',
 
       keywords='python mysql class',
 
-      download_url='https://github.com/ligyxy/DictMySQL',
+      url='https://ligyxy.github.io/DictMySQL/',
 
       install_requires=["PyMySQL>=0.7"],
       )
