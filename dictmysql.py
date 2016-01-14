@@ -179,7 +179,6 @@ class DictMySQL:
             c = negative_symbol.get(c) if is_not else c
             return ' ' + c + ' ' if whitespace else c
 
-        result = {'q': [], 'v': ()}
         placeholder = '%s'
 
         def _combining(_cond, _operator=None, upper_key=None, connector=None, _not=False):
@@ -195,13 +194,13 @@ class DictMySQL:
                     # {'>':{'value':10}}
                     elif k.upper() in _operators:
                         _combining(v, _operator=_operators[k.upper()], upper_key=upper_key, connector=connector, _not=_not)
-                    # {'value':10}
+                    # {'$NOT':{'value':10}}
                     elif k.upper() == '$NOT':
                         _combining(v, upper_key=upper_key, _operator=_operator, connector=connector, _not=not _not)
                     # {'value':10}
                     else:
                         _combining(v, upper_key=k, _operator=_operator, connector=connector, _not=_not)
-                    # default 'AND' except for the last one
+                    # append 'AND' by default except for the last one
                     if i < len(_cond):
                         result['q'].append(_get_connector('AND', is_not=_not, whitespace=True))
                     i += 1
@@ -215,7 +214,7 @@ class DictMySQL:
                         if l_index < len(_cond):
                             result['q'].append(_get_connector(connector, is_not=_not, whitespace=True))
                         l_index += 1
-                elif _operator in ['=', '$IN'] or not _operator:
+                elif _operator in ['=', 'IN'] or not _operator:
                     s_q = self._backtick(upper_key) + (' NOT' if _not else '') + ' IN (' + ', '.join(['%s']*len(_cond)) + ')'
                     result['q'].append('(' + s_q + ')')
                     result['v'] += tuple(_cond)
@@ -262,7 +261,7 @@ class DictMySQL:
         """
         if not columns:
             columns = ['*']
-
+        # TODO: add function support in columns/_backtick_columns
         where_q, _args = self._where_parser(where)
 
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
@@ -337,7 +336,7 @@ class DictMySQL:
         :type table: string
         :type value: dict
         :type update_columns: list
-        :param update_columns: specify the columns will be updated if record exists
+        :param update_columns: specify the columns which will be updated if record exists
         :type commit: bool
         """
         if not isinstance(value, dict):
@@ -351,6 +350,7 @@ class DictMySQL:
         _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick_columns(value), ') VALUES ',
                         '(', value_q, ') ',
                         'ON DUPLICATE KEY UPDATE ', ', '.join([k + '=VALUES(' + k + ')' for k in update_columns]), ';'])
+        # TODO: bt this column names
 
         if self.debug:
             return _sql % _args
