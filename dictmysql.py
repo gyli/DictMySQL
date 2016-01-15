@@ -60,13 +60,11 @@ class DictMySQL:
     def _backtick_columns(cols):
         # backtick the former part when it meets the first dot, and then all the rest
         def bt(s):
-            if s == '*':
-                return ['*']
-            elif s:
-                return ['`' + s + '`']
-            else:
-                return []
-        return ', '.join(['.'.join(bt(v.split('.')[0]) + bt('.'.join(v.split('.')[1:]))) for v in cols])
+            b = '`' if s == '*' else ''
+            return b + (s or '') + b
+        return ', '.join(
+                [c[1:] if c[0] == '#' else '.'.join(bt(c.split('.')[0]) + bt('.'.join(c.split('.')[1:]))) for c in cols]
+        )
 
     def _backtick(self, value):
         return self._backtick_columns((value,))
@@ -99,8 +97,8 @@ class DictMySQL:
 
     def _value_parser(self, value, columnname=False, placeholder='%s'):
         """
-        For insert: {'c1': 'v', 'c2': None, 'c3': '#uuid()'} -> ('%s, %s, uuid()', [None, 'v'])
-        For update: {'c1': 'v', 'c2': None, 'c3': '#uuid()'} -> ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])
+        For insert: {'c1': 'v', 'c2': None, '#c3': 'uuid()'} -> ('%s, %s, uuid()', [None, 'v'])
+        For update: {'c1': 'v', 'c2': None, '#c3': 'uuid()'} -> ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])
         No need to transform NULL value since it's supported in execute()
         """
         if not isinstance(value, dict):
@@ -108,9 +106,9 @@ class DictMySQL:
         q = []
         a = []
         for k, v in value.items():
-            is_function = isinstance(v, basestring) and v[0] == '#'
-            item_value = v[1:] if is_function else placeholder
-            q.append(' = '.join([self._backtick(k), item_value]) if columnname else item_value)
+            is_function = k[0] == '#'
+            item_value = v if is_function else placeholder
+            q.append(' = '.join([self._backtick(k[1:]), item_value]) if columnname else item_value)
             if not is_function:
                 a.append(v)
         return ', '.join(q), tuple(a)
@@ -130,8 +128,6 @@ class DictMySQL:
         return join_q
 
     def _where_parser(self, where, placeholder='%s'):
-        # TODO: add function support in where
-
         if not where:
             return '', ()
 
@@ -173,6 +169,8 @@ class DictMySQL:
             'AND': 'OR',
             'OR': 'AND'
         }
+        # TODO: confirm datetime support for more operators
+        # TODO: LIKE Wildcard support
 
         def _get_connector(c, is_not, whitespace=False):
             c = c or '='
@@ -182,7 +180,6 @@ class DictMySQL:
         placeholder = '%s'
 
         def _combining(_cond, _operator=None, upper_key=None, connector=None, _not=False):
-            # TODO: add # support
             if isinstance(_cond, dict):
                 i = 1
                 for k, v in _cond.items():
@@ -232,9 +229,14 @@ class DictMySQL:
                 s_q = self._backtick(upper_key) + ' IS' + (' NOT' if _not else '') + ' NULL'
                 result['q'].append('(' + s_q + ')')
             else:
-                s_q = ' '.join([self._backtick(upper_key), _get_connector(_operator, is_not=_not), placeholder])
+                if upper_key[0] == '#':
+                    item_value = _cond
+                    upper_key = upper_key[1:]  # for functions, remove the # symbol and no need to quote the value
+                else:
+                    item_value = placeholder
+                    result['v'] += (_cond,)
+                s_q = ' '.join([self._backtick(upper_key), _get_connector(_operator, is_not=_not), item_value])
                 result['q'].append('(' + s_q + ')')
-                result['v'] += (_cond,)
 
         _combining(where)
         return ' WHERE ' + ''.join(result['q']), result['v']
@@ -261,7 +263,6 @@ class DictMySQL:
         """
         if not columns:
             columns = ['*']
-        # TODO: add function support in columns/_backtick_columns
         where_q, _args = self._where_parser(where)
 
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
