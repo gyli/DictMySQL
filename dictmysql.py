@@ -269,7 +269,7 @@ class DictMySQL:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         self._join_parser(join),
                         where_q,
-                        self._whitespace_decorator(order) if order else '',
+                        (' ORDER BY ' + order) if order else '',
                         self._limit_parser(limit), ';'])
 
         if self.debug:
