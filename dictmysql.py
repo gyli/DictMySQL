@@ -32,6 +32,7 @@ class DictMySQL:
         self.debug = False
 
     def reconnect(self):
+        # TODO: add auto reconnect
         try:
             self.cursorclass = pymysql.cursors.DictCursor if self.dictcursor else pymysql.cursors.Cursor
             self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
@@ -97,8 +98,10 @@ class DictMySQL:
 
     def _value_parser(self, value, columnname=False, placeholder='%s'):
         """
-        For insert: {'c1': 'v', 'c2': None, '#c3': 'uuid()'} -> ('%s, %s, uuid()', [None, 'v'])
-        For update: {'c1': 'v', 'c2': None, '#c3': 'uuid()'} -> ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])
+        Input: {'c1': 'v', 'c2': None, '#c3': 'uuid()'}
+        Output:
+        ('%s, %s, uuid()', [None, 'v'])                             # insert
+        ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])        # update
         No need to transform NULL value since it's supported in execute()
         """
         if not isinstance(value, dict):
@@ -319,7 +322,6 @@ class DictMySQL:
         :type commit: bool
         :return: int. The row id of the insert.
         """
-        # TODO: function for brackets
         value_q, _args = self._value_parser(value, columnname=False)
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
                         ' (', self._backtick_columns(value), ') VALUES (', value_q, ');'])
