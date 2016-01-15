@@ -61,8 +61,8 @@ class DictMySQL:
     def _backtick_columns(cols):
         # backtick the former part when it meets the first dot, and then all the rest
         def bt(s):
-            b = '`' if s == '*' else ''
-            return b + (s or '') + b
+            b = '' if s == '*' or not s else '`'
+            return [_ for _ in [b + (s or '') + b] if _]
         return ', '.join(
                 [c[1:] if c[0] == '#' else '.'.join(bt(c.split('.')[0]) + bt('.'.join(c.split('.')[1:]))) for c in cols]
         )
