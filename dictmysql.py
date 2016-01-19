@@ -300,7 +300,7 @@ class DictMySQL:
         if self.debug:
             return select_result
         else:
-            result = select_result[0]
+            result = select_result[0] if select_result else None
 
         if result:
             return result[0 if self.cursorclass is pymysql.cursors.Cursor else column]
