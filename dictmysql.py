@@ -432,6 +432,13 @@ class DictMySQL:
             self.commit()
         return result
 
+    def column_name(self, table):
+        _sql = "SELECT `COLUMN_NAME` FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE `TABLE_SCHEMA`=%s AND `TABLE_NAME`=%s;"
+        _args = (self.db, table)
+
+        self.cur.execute(_sql, _args)
+        return self.cur.fetchall()
+
     def now(self):
         query = "SELECT NOW() AS now;"
         if self.debug:
