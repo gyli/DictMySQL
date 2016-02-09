@@ -13,7 +13,7 @@ if sys.version_info[0] >= 3:
 
 
 class DictMySQL:
-    def __init__(self, host, user, passwd, db, port=3306, charset='utf8', init_command='SET NAMES UTF8',
+    def __init__(self, host, user, passwd, db=None, port=3306, charset='utf8', init_command='SET NAMES UTF8',
                  dictcursor=False, use_unicode=True):
         self.host = host
         self.port = int(port)
