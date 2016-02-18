@@ -5,11 +5,6 @@ from __future__ import print_function
 import pymysql
 import pymysql.cursors
 import re
-import sys
-
-
-if sys.version_info[0] >= 3:
-    basestring = str
 
 
 class DictMySQL:
@@ -100,8 +95,8 @@ class DictMySQL:
         """
         Input: {'c1': 'v', 'c2': None, '#c3': 'uuid()'}
         Output:
-        ('%s, %s, uuid()', [None, 'v'])                             # insert
-        ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])        # update
+        ('%s, %s, uuid()', [None, 'v'])                             # insert; columnname=False
+        ('`c2` = %s, `c1` = %s, `c3` = uuid()', [None, 'v'])        # update; columnname=True
         No need to transform NULL value since it's supported in execute()
         """
         if not isinstance(value, dict):
@@ -109,10 +104,10 @@ class DictMySQL:
         q = []
         a = []
         for k, v in value.items():
-            is_function = k[0] == '#'
-            item_value = v if is_function else placeholder
-            q.append(' = '.join([self._backtick(k[1:]), item_value]) if columnname else item_value)
-            if not is_function:
+            if k[0] == '#':  # if is sql function
+                q.append(' = '.join([self._backtick(k[1:]), str(v)]) if columnname else v)
+            else:
+                q.append(' = '.join([self._backtick(k), placeholder]) if columnname else placeholder)
                 a.append(v)
         return ', '.join(q), tuple(a)
 
@@ -276,7 +271,8 @@ class DictMySQL:
                         self._limit_parser(limit), ';'])
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         self.cur.execute(_sql, _args)
         return self.cur.fetchall()
@@ -298,19 +294,21 @@ class DictMySQL:
         select_result = self.select(table=table, columns=[column], join=join, where=where, limit=1)
 
         if self.debug:
-            return select_result
-        else:
-            result = select_result[0] if select_result else None
+            return
+
+        result = select_result[0] if select_result else None
 
         if result:
             return result[0 if self.cursorclass is pymysql.cursors.Cursor else column]
-        else:
-            if ifnone:
-                raise ValueError(ifnone)
-            if insert:
-                if any([isinstance(d, dict) for d in where.values()]):
-                    raise ValueError("The where parameter in get() doesn't support nested condition with insert==True.")
-                return self.insert(table=table, value=where)
+
+        if ifnone:
+            raise ValueError(ifnone)
+
+        if insert:
+            if any([isinstance(d, dict) for d in where.values()]):
+                raise ValueError("The where parameter in get() doesn't support nested condition with insert==True.")
+            return self.insert(table=table, value=where)
+
         return None
 
     def insert(self, table, value, ignore=False, commit=True):
@@ -327,7 +325,8 @@ class DictMySQL:
                         ' (', self._backtick_columns(value), ') VALUES (', value_q, ');'])
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         self.cur.execute(_sql, _args)
         if commit:
@@ -356,7 +355,8 @@ class DictMySQL:
         # TODO: bt this column names
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         self.cur.execute(_sql, _args)
         if commit:
@@ -383,7 +383,8 @@ class DictMySQL:
         _args = tuple(value)
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         self.cur.executemany(_sql, _args)
         if commit:
@@ -407,7 +408,8 @@ class DictMySQL:
         _args = _value_args + _where_args
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         result = self.cur.execute(_sql, _args)
         if commit:
@@ -425,7 +427,8 @@ class DictMySQL:
         _sql = ''.join(['DELETE FROM ', self._backtick(table), where_q, ';'])
 
         if self.debug:
-            return _sql % _args
+            print(_sql % _args)
+            return
 
         result = self.cur.execute(_sql, _args)
         if commit:
@@ -442,7 +445,8 @@ class DictMySQL:
     def now(self):
         query = "SELECT NOW() AS now;"
         if self.debug:
-            return query
+            print(query)
+            return
         self.cur.execute(query)
         return self.cur.fetchone()[0 if self.cursorclass is pymysql.cursors.Cursor else 'now'].strftime(
                 "%Y-%m-%d %H:%M:%S")
@@ -450,7 +454,8 @@ class DictMySQL:
     def last_insert_id(self):
         query = "SELECT LAST_INSERT_ID() AS lid;"
         if self.debug:
-            return query
+            print(query)
+            return
         self.query(query)
         return self.cur.fetchone()[0 if self.cursorclass is pymysql.cursors.Cursor else 'lid']
 
