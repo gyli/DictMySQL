@@ -25,6 +25,7 @@ class DictMySQL:
                                     use_unicode=self.use_unicode)
         self.cur = self.conn.cursor()
         self.debug = False
+        self.last_query = None
 
     def reconnect(self):
         # TODO: add auto reconnect
@@ -270,8 +271,10 @@ class DictMySQL:
                         (' ORDER BY ' + order) if order else '',
                         self._limit_parser(limit), ';'])
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         self.cur.execute(_sql, _args)
@@ -307,6 +310,7 @@ class DictMySQL:
         if insert:
             if any([isinstance(d, dict) for d in where.values()]):
                 raise ValueError("The where parameter in get() doesn't support nested condition with insert==True.")
+            # TODO: debug insert
             return self.insert(table=table, value=where)
 
         return None
@@ -324,8 +328,10 @@ class DictMySQL:
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
                         ' (', self._backtick_columns(value), ') VALUES (', value_q, ');'])
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         self.cur.execute(_sql, _args)
@@ -354,8 +360,10 @@ class DictMySQL:
                         'ON DUPLICATE KEY UPDATE ', ', '.join(['='.join([k, k]) for k in update_columns]), ';'])
         # TODO: bt this column names
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         self.cur.execute(_sql, _args)
@@ -382,8 +390,10 @@ class DictMySQL:
                         ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
         _args = tuple(value)
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         self.cur.executemany(_sql, _args)
@@ -407,8 +417,10 @@ class DictMySQL:
         _sql = ''.join(['UPDATE ', self._backtick(table), ' SET ', value_q, where_q, ';'])
         _args = _value_args + _where_args
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         result = self.cur.execute(_sql, _args)
@@ -426,8 +438,10 @@ class DictMySQL:
 
         _sql = ''.join(['DELETE FROM ', self._backtick(table), where_q, ';'])
 
+        self.last_query = _sql % _args
+
         if self.debug:
-            print(_sql % _args)
+            print(self.last_query)
             return
 
         result = self.cur.execute(_sql, _args)
