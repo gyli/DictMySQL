@@ -390,7 +390,7 @@ class DictMySQL:
                         ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
         _args = tuple(value)
 
-        self.last_query = _sql % _args
+        self.last_query = _sql
 
         if self.debug:
             print(self.last_query)
