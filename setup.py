@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# -*-coding:UTF-8 -*-
+# -*-coding: utf-8 -*-
 
 from setuptools import setup
 from os import path
