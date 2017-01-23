@@ -377,8 +377,16 @@ class DictMySQL:
                         ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
         _args = tuple(value)
 
+        # For insertmany, the base queries for executemany and printing are different
+        _sql_full = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
+                             ' (', self._backtick_columns(columns), ') VALUES ',
+                             ', '.join([''.join(['(', ', '.join(['%s'] * len(columns)), ')'])] * len(_args)),
+                             ';'])
+
+        _args_flattened = [item for sublist in _args for item in sublist]
+
         if self.debug:
-            return self.cur.mogrify(_sql, _args)
+            return self.cur.mogrify(_sql_full, _args_flattened)
 
         self.cur.executemany(_sql, _args)
         if commit:
