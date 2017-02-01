@@ -373,8 +373,9 @@ class DictMySQL:
         if not isinstance(value, (list, tuple)):
             raise TypeError('Input value should be a list or tuple')
 
+        # Cannot add semicolon here, otherwise it will not pass the Cursor.executemany validation
         _sql = ''.join(['INSERT', ' IGNORE' if ignore else '', ' INTO ', self._backtick(table),
-                        ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ');'])
+                        ' (', self._backtick_columns(columns), ') VALUES (', ', '.join(['%s'] * len(columns)), ')'])
         _args = tuple(value)
 
         # For insertmany, the base queries for executemany and printing are different
