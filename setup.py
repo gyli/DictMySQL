@@ -8,7 +8,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(name='dictmysql',
 
-      version='0.4.12',
+      version='0.4.13',
 
       description='A mysql class for more convenient database manipulations with Python dictionary.',
 
