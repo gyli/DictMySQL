@@ -6,11 +6,16 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
+with open('README.rst', encoding='utf-8') as f:
+    long_description = f.read()
+
 setup(name='dictmysql',
 
-      version='0.5.0',
+      version='0.5.1',
 
       description='A mysql class for more convenient database manipulations with Python dictionary.',
+
+      long_description=long_description,
 
       author='Guangyang Li',
 
