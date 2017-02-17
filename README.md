@@ -2,7 +2,7 @@
 
 PyPI page: [https://pypi.python.org/pypi/dictmysql](https://pypi.python.org/pypi/dictmysql)
 
-Documentation: [https://ligyxy.github.io/DictMySQL](https://ligyxy.github.io/DictMySQL)
+Documentation: [https://git.io/dictmysql](https://git.io/dictmysql)
 
 ## Introduction
 A mysql class on the top of [PyMySQL](https://github.com/PyMySQL/PyMySQL), for more convenient database manipulation with Python dictionary.
