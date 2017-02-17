@@ -9,7 +9,7 @@ import re
 
 class DictMySQL:
     def __init__(self, host, user, passwd, db=None, port=3306, charset='utf8', init_command='SET NAMES UTF8',
-                 dictcursor=False, use_unicode=True):
+                 dictcursor=False, use_unicode=True, autocommit=False):
         self.host = host
         self.port = int(port)
         self.user = user
@@ -20,9 +20,10 @@ class DictMySQL:
         self.charset = charset
         self.init_command = init_command
         self.use_unicode = use_unicode
+        self.autocommit_mode = bool(autocommit)
         self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
                                     charset=charset, init_command=init_command, cursorclass=self.cursorclass,
-                                    use_unicode=self.use_unicode)
+                                    use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
         self.cur = self.conn.cursor()
         self.debug = False
 
@@ -32,7 +33,7 @@ class DictMySQL:
             self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
                                         db=self.db, cursorclass=self.cursorclass, charset=self.charset,
                                         init_command=self.init_command,
-                                        use_unicode=self.use_unicode)
+                                        use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
             self.cur = self.conn.cursor()
             return True
         except pymysql.Error as e:
@@ -53,7 +54,9 @@ class DictMySQL:
 
     @staticmethod
     def _backtick_columns(cols):
-        # backtick the former part when it meets the first dot, and then all the rest
+        """
+        backtick the former part when it meets the first dot, and then all the rest
+        """
         def bt(s):
             b = '' if s == '*' or not s else '`'
             return [_ for _ in [b + (s or '') + b] if _]
@@ -114,15 +117,44 @@ class DictMySQL:
         if not join:
             return ''
 
-        join_q = ''
+        # JOIN only supports <, <=, >, >=, <> and =
+        _operators = {
+            '$=': '=',
+            '$EQ': '=',
+            '$<': '<',
+            '$LT': '<',
+            '$>': '>',
+            '$GT': '>',
+            '$<=': '<=',
+            '$LTE': '<=',
+            '$>=': '>=',
+            '$GTE': '>=',
+            '$<>': '<>',
+            '$NE': '<>',
+        }
+
+        join_query = ''
         for j_table, j_on in join.items():
             join_table = self._tablename_parser(j_table)
-            join_q += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '', ' JOIN ',
-                               join_table['formatted_tablename'],
-                               ' ON ',
-                               ' AND '.join(['='.join([self._backtick(o_k),
-                                                       self._backtick(o_v)]) for o_k, o_v in j_on.items()])])
-        return join_q
+            joins = []
+            for left_table, right_table_join in j_on.items():
+                # {'left_table': {'$<>': 'right_table', }, }
+                if isinstance(right_table_join, dict):
+                    join_right_tables = []
+                    for join_method, right_table in right_table_join.items():
+                        j_symbol = _operators[join_method.upper()]
+                        join_right_tables.append(j_symbol.join([self._backtick(left_table),
+                                                                self._backtick(right_table)]))
+                    joins.append(' AND '.join(join_right_tables))
+                # {'left_table': 'right_table', }
+                else:
+                    joins.append('='.join([self._backtick(left_table), self._backtick(right_table_join)]))
+            join_query += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '',
+                                   ' JOIN ',
+                                   join_table['formatted_tablename'],
+                                   ' ON ',
+                                   ' AND '.join(joins)])
+        return join_query
 
     def _where_parser(self, where, placeholder='%s'):
         if not where:
