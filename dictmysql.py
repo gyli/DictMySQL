@@ -137,18 +137,18 @@ class DictMySQL:
         for j_table, j_on in join.items():
             join_table = self._tablename_parser(j_table)
             joins = []
-            for left_table, right_table_join in j_on.items():
+            for left_column, join_right_column in j_on.items():
                 # {'left_table': {'$<>': 'right_table', }, }
-                if isinstance(right_table_join, dict):
+                if isinstance(join_right_column, dict):
                     join_right_tables = []
-                    for join_method, right_table in right_table_join.items():
+                    for join_method, right_column in join_right_column.items():
                         j_symbol = _operators[join_method.upper()]
-                        join_right_tables.append(j_symbol.join([self._backtick(left_table),
-                                                                self._backtick(right_table)]))
+                        join_right_tables.append(j_symbol.join([self._backtick(left_column),
+                                                                self._backtick(right_column)]))
                     joins.append(' AND '.join(join_right_tables))
                 # {'left_table': 'right_table', }
                 else:
-                    joins.append('='.join([self._backtick(left_table), self._backtick(right_table_join)]))
+                    joins.append('='.join([self._backtick(left_column), self._backtick(join_right_column)]))
             join_query += ''.join([(' ' + join_table['join_type']) if join_table['join_type'] else '',
                                    ' JOIN ',
                                    join_table['formatted_tablename'],
