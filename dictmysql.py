@@ -231,6 +231,7 @@ class DictMySQL:
                         result['q'].append(_get_connector('AND', is_not=_not, whitespace=True))
                     i += 1
 
+            # TODO:'age': 0 to NULL
             elif isinstance(_cond, list):
                 # [{'age': {'$>': 22}}, {'amount': {'$<': 100}}]
                 if all(isinstance(c, dict) for c in _cond):
@@ -254,7 +255,7 @@ class DictMySQL:
                     result['v'] += tuple(_cond)
                 # if keyword not in prefilled list but value is not dict also, should return error
 
-            elif not _cond:
+            elif _cond is None:
                 s_q = self._backtick(upper_key) + ' IS' + (' NOT' if _not else '') + ' NULL'
                 result['q'].append('(' + s_q + ')')
             else:
