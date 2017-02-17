@@ -279,13 +279,14 @@ class DictMySQL:
         else:
             return ''
 
-    def select(self, table, columns=None, join=None, where=None, order=None, limit=None):
+    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None):
         """
         :type table: string
         :type columns: list
         :type join: dict
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}} -> "LEFT JOIN table AS t1 ON user.id = t1.user_id"
         :type where: dict
+        :type group: string
         :type order: string
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
@@ -298,6 +299,7 @@ class DictMySQL:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         self._join_parser(join),
                         where_q,
+                        (' GROUP BY ' + group) if group else '',
                         (' ORDER BY ' + order) if order else '',
                         self._limit_parser(limit), ';'])
 
