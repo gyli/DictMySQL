@@ -231,7 +231,6 @@ class DictMySQL:
                         result['q'].append(_get_connector('AND', is_not=_not, whitespace=True))
                     i += 1
 
-            # TODO:'age': 0 to NULL
             elif isinstance(_cond, list):
                 # [{'age': {'$>': 22}}, {'amount': {'$<': 100}}]
                 if all(isinstance(c, dict) for c in _cond):
@@ -295,6 +294,8 @@ class DictMySQL:
         if not columns:
             columns = ['*']
         where_q, _args = self._where_parser(where)
+
+        # TODO: support multiple table
 
         _sql = ''.join(['SELECT ', self._backtick_columns(columns),
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
@@ -453,7 +454,7 @@ class DictMySQL:
             self.commit()
         return result
 
-    def delete(self, table, where, commit=True):
+    def delete(self, table, where=None, commit=True):
         """
         :type table: string
         :type where: dict
@@ -461,7 +462,11 @@ class DictMySQL:
         """
         where_q, _args = self._where_parser(where)
 
-        _sql = ''.join(['DELETE FROM ', self._backtick(table), where_q, ';'])
+        alias = self._tablename_parser(table)['alias']
+
+        _sql = ''.join(['DELETE ',
+                        alias + ' ' if alias else '',
+                        'FROM ', self._tablename_parser(table)['formatted_tablename'], where_q, ';'])
 
         if self.debug:
             return self.cur.mogrify(_sql, _args)
