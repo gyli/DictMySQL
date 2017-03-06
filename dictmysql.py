@@ -485,6 +485,13 @@ class DictMySQL:
         self.cur.execute(_sql, _args)
         return self.cur.fetchall()
 
+    def table_name(self):
+        _sql = "SELECT `table_name` FROM `INFORMATION_SCHEMA`.`TABLES` where `TABLE_SCHEMA`=%s;"
+        _args = (self.db,)
+
+        self.cur.execute(_sql, _args)
+        return self.cur.fetchall()
+
     def now(self):
         query = "SELECT NOW() AS now;"
         if self.debug:
