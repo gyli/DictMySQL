@@ -279,7 +279,14 @@ class DictMySQL:
         else:
             return ''
 
-    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None):
+    def _yield_result(self):
+        while True:
+            result = self.cur.fetchone()
+            if not result:
+                break
+            yield result
+
+    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None, iterator=False):
         """
         :type table: string
         :type columns: list
@@ -290,6 +297,7 @@ class DictMySQL:
         :type order: string
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
+        :param iterator: Whether to output the result in a generator
         """
         if not columns:
             columns = ['*']
@@ -309,6 +317,10 @@ class DictMySQL:
             return self.cur.mogrify(_sql, _args)
 
         self.cur.execute(_sql, _args)
+
+        if iterator:
+            return self._yield_result()
+
         return self.cur.fetchall()
 
     def get(self, table, column, join=None, where=None, insert=False, ifnone=None):
@@ -514,6 +526,9 @@ class DictMySQL:
 
     def fetchall(self):
         return self.cur.fetchall()
+
+    def fetchmany(self, size=None):
+        return self.cur.fetchmany(size=size)
 
     def lastrowid(self):
         return self.cur.lastrowid
