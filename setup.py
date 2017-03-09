@@ -11,9 +11,9 @@ with open('README.rst') as f:
 
 setup(name='dictmysql',
 
-      version='0.5.7',
+      version='0.5.8',
 
-      description='A mysql class for more convenient database manipulations with Python dictionary.',
+      description='A MySQL class for more convenient database manipulations with Python dictionary.',
 
       long_description=long_description,
 
