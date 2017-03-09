@@ -3,20 +3,24 @@
 
 from __future__ import print_function
 import pymysql
-import pymysql.cursors
 import re
 
 
 class DictMySQL:
     def __init__(self, host, user, passwd, db=None, port=3306, charset='utf8', init_command='SET NAMES UTF8',
-                 dictcursor=False, use_unicode=True, autocommit=False):
+                 dictcursor=False, cursorclass=pymysql.cursors.Cursor, use_unicode=True, autocommit=False):
+        """
+        :param dictcursor: Deprecated
+        """
         self.host = host
         self.port = int(port)
         self.user = user
         self.passwd = passwd
         self.db = db
         self.dictcursor = dictcursor
-        self.cursorclass = pymysql.cursors.DictCursor if dictcursor else pymysql.cursors.Cursor
+        self.cursorclass = cursorclass
+        if self.dictcursor:
+            self.cursorclass = pymysql.cursors.DictCursor
         self.charset = charset
         self.init_command = init_command
         self.use_unicode = use_unicode
@@ -29,7 +33,8 @@ class DictMySQL:
 
     def reconnect(self):
         try:
-            self.cursorclass = pymysql.cursors.DictCursor if self.dictcursor else pymysql.cursors.Cursor
+            if self.dictcursor:
+                self.cursorclass = pymysql.cursors.DictCursor
             self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
                                         db=self.db, cursorclass=self.cursorclass, charset=self.charset,
                                         init_command=self.init_command,
@@ -297,7 +302,8 @@ class DictMySQL:
         :type order: string
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
-        :param iterator: Whether to output the result in a generator
+        :param iterator: Whether to output the result in a generator. It always returns generator if the cursor is
+                         SSCursor or SSDictCursor, no matter iterator is True or False.
         """
         if not columns:
             columns = ['*']
@@ -317,6 +323,9 @@ class DictMySQL:
             return self.cur.mogrify(_sql, _args)
 
         self.cur.execute(_sql, _args)
+
+        if self.cursorclass in (pymysql.cursors.SSCursor, pymysql.cursors.SSDictCursor):
+            return self.cur
 
         if iterator:
             return self._yield_result()
