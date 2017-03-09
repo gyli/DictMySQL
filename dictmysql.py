@@ -287,7 +287,8 @@ class DictMySQL:
                 break
             yield result
 
-    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None, iterator=False):
+    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None, iterator=False,
+               fetch=True):
         """
         :type table: string
         :type columns: list
@@ -300,6 +301,7 @@ class DictMySQL:
         :param limit: The max row number you want to get from the query.
         :param iterator: Whether to output the result in a generator. It always returns generator if the cursor is
                          SSCursor or SSDictCursor, no matter iterator is True or False.
+        :type fetch: bool
         """
         if not columns:
             columns = ['*']
@@ -318,7 +320,10 @@ class DictMySQL:
         if self.debug:
             return self.cur.mogrify(_sql, _args)
 
-        self.cur.execute(_sql, _args)
+        execute_result = self.cur.execute(_sql, _args)
+
+        if not fetch:
+            return execute_result
 
         if self.cursorclass in (pymysql.cursors.SSCursor, pymysql.cursors.SSDictCursor):
             return self.cur
