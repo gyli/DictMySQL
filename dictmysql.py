@@ -25,21 +25,26 @@ class DictMySQL:
         self.init_command = init_command
         self.use_unicode = use_unicode
         self.autocommit_mode = bool(autocommit)
-        self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd, db=self.db,
-                                    charset=charset, init_command=init_command, cursorclass=self.cursorclass,
-                                    use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
-        self.cur = self.conn.cursor()
+        self.connection = self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user,
+                                                      passwd=self.passwd, db=self.db, charset=charset,
+                                                      init_command=init_command, cursorclass=self.cursorclass,
+                                                      use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
+        self.cursor = self.cur = self.conn.cursor()
         self.debug = False
+
+        # Copy pymysql attributes
+        self.err = pymysql.err
+        self.cursors = pymysql.cursors
 
     def reconnect(self):
         try:
             if self.dictcursor:
                 self.cursorclass = pymysql.cursors.DictCursor
-            self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user, passwd=self.passwd,
-                                        db=self.db, cursorclass=self.cursorclass, charset=self.charset,
-                                        init_command=self.init_command,
-                                        use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
-            self.cur = self.conn.cursor()
+            self.connection = self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user,
+                                                          passwd=self.passwd, db=self.db, cursorclass=self.cursorclass,
+                                                          charset=self.charset, init_command=self.init_command,
+                                                          use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
+            self.cursor = self.cur = self.conn.cursor()
             return True
         except pymysql.Error as e:
             print("Mysql Error: %s" % (e,))
