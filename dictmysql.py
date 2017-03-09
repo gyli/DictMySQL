@@ -6,9 +6,13 @@ import pymysql
 import re
 
 
+err = pymysql.err
+cursors = pymysql.cursors
+
+
 class DictMySQL:
     def __init__(self, host, user, passwd, db=None, port=3306, charset='utf8', init_command='SET NAMES UTF8',
-                 dictcursor=False, cursorclass=pymysql.cursors.Cursor, use_unicode=True, autocommit=False):
+                 dictcursor=False, cursorclass=cursors.Cursor, use_unicode=True, autocommit=False):
         """
         :param dictcursor: Deprecated
         """
@@ -20,7 +24,7 @@ class DictMySQL:
         self.dictcursor = dictcursor
         self.cursorclass = cursorclass
         if self.dictcursor:
-            self.cursorclass = pymysql.cursors.DictCursor
+            self.cursorclass = cursors.DictCursor
         self.charset = charset
         self.init_command = init_command
         self.use_unicode = use_unicode
@@ -32,35 +36,22 @@ class DictMySQL:
         self.cursor = self.cur = self.conn.cursor()
         self.debug = False
 
-        # Copy pymysql attributes
-        self.err = pymysql.err
-        self.cursors = pymysql.cursors
-
     def reconnect(self):
-        try:
-            if self.dictcursor:
-                self.cursorclass = pymysql.cursors.DictCursor
-            self.connection = self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user,
-                                                          passwd=self.passwd, db=self.db, cursorclass=self.cursorclass,
-                                                          charset=self.charset, init_command=self.init_command,
-                                                          use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
-            self.cursor = self.cur = self.conn.cursor()
-            return True
-        except pymysql.Error as e:
-            print("Mysql Error: %s" % (e,))
-            return False
+        if self.dictcursor:
+            self.cursorclass = cursors.DictCursor
+        self.connection = self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user,
+                                                      passwd=self.passwd, db=self.db, cursorclass=self.cursorclass,
+                                                      charset=self.charset, init_command=self.init_command,
+                                                      use_unicode=self.use_unicode, autocommit=self.autocommit_mode)
+        self.cursor = self.cur = self.conn.cursor()
+        return True
 
     def query(self, sql, args=None):
         """
         :param sql: string. SQL query.
         :param args: tuple. Arguments of this query.
         """
-        try:
-            result = self.cur.execute(sql, args)
-        except pymysql.Error as e:
-            result = None
-            print("Mysql Error: %s\nOriginal SQL:%s" % (e, sql))
-        return result
+        return self.cur.execute(sql, args)
 
     @staticmethod
     def _backtick_columns(cols):
