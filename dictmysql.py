@@ -56,14 +56,23 @@ class DictMySQL:
     @staticmethod
     def _backtick_columns(cols):
         """
-        backtick the former part when it meets the first dot, and then all the rest
+        Quote the column names
         """
         def bt(s):
             b = '' if s == '*' or not s else '`'
             return [_ for _ in [b + (s or '') + b] if _]
-        return ', '.join(
-                [c[1:] if c[0] == '#' else '.'.join(bt(c.split('.')[0]) + bt('.'.join(c.split('.')[1:]))) for c in cols]
-        )
+
+        formatted = []
+        for c in cols:
+            if c[0] == '#':
+                formatted.append(c[1:])
+            elif c.startswith('(') and c.endswith(')'):
+                formatted.append(c[1:-1])
+            else:
+                # backtick the former part when it meets the first dot, and then all the rest
+                formatted.append('.'.join(bt(c.split('.')[0]) + bt('.'.join(c.split('.')[1:]))))
+
+        return ', '.join(formatted)
 
     def _backtick(self, value):
         return self._backtick_columns((value,))
@@ -287,8 +296,8 @@ class DictMySQL:
                 break
             yield result
 
-    def select(self, table, columns=None, join=None, where=None, group=None, order=None, limit=None, iterator=False,
-               fetch=True):
+    def select(self, table, columns=None, join=None, where=None, group=None, having=None, order=None, limit=None,
+               iterator=False, fetch=True):
         """
         :type table: string
         :type columns: list
@@ -296,6 +305,7 @@ class DictMySQL:
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}} -> "LEFT JOIN table AS t1 ON user.id = t1.user_id"
         :type where: dict
         :type group: string
+        :type having: string
         :type order: string
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
@@ -314,6 +324,7 @@ class DictMySQL:
                         self._join_parser(join),
                         where_q,
                         (' GROUP BY ' + group) if group else '',
+                        (' HAVING ' + group) if group else '',
                         (' ORDER BY ' + order) if order else '',
                         self._limit_parser(limit), ';'])
 
