@@ -67,7 +67,8 @@ class DictMySQL:
             if c[0] == '#':
                 formatted.append(c[1:])
             elif c.startswith('(') and c.endswith(')'):
-                formatted.append(c[1:-1])
+                # WHERE (column_a, column_b) IN ((1,10), (1,20))
+                formatted.append(c)
             else:
                 # backtick the former part when it meets the first dot, and then all the rest
                 formatted.append('.'.join(bt(c.split('.')[0]) + bt('.'.join(c.split('.')[1:]))))
