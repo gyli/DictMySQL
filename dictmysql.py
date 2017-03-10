@@ -296,6 +296,9 @@ class DictMySQL:
                 break
             yield result
 
+    def _concat_list(self, l):
+        return ', '.join(self._backtick_columns(l))
+
     def select(self, table, columns=None, join=None, where=None, group=None, having=None, order=None, limit=None,
                iterator=False, fetch=True):
         """
@@ -304,9 +307,9 @@ class DictMySQL:
         :type join: dict
         :param join: {'[>]table1(t1)': {'user.id': 't1.user_id'}} -> "LEFT JOIN table AS t1 ON user.id = t1.user_id"
         :type where: dict
-        :type group: string
+        :type group: string|list
         :type having: string
-        :type order: string
+        :type order: string|list
         :type limit: int|list
         :param limit: The max row number you want to get from the query.
         :param iterator: Whether to output the result in a generator. It always returns generator if the cursor is
@@ -323,9 +326,9 @@ class DictMySQL:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         self._join_parser(join),
                         where_q,
-                        (' GROUP BY ' + group) if group else '',
-                        (' HAVING ' + group) if group else '',
-                        (' ORDER BY ' + order) if order else '',
+                        (' GROUP BY ' + self._concat_list(group)) if group else '',
+                        (' HAVING ' + having) if having else '',
+                        (' ORDER BY ' + self._concat_list(order)) if order else '',
                         self._limit_parser(limit), ';'])
 
         if self.debug:
