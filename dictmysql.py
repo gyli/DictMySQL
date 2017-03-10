@@ -296,9 +296,6 @@ class DictMySQL:
                 break
             yield result
 
-    def _concat_list(self, l):
-        return ', '.join(self._backtick_columns(l))
-
     def select(self, table, columns=None, join=None, where=None, group=None, having=None, order=None, limit=None,
                iterator=False, fetch=True):
         """
@@ -326,9 +323,9 @@ class DictMySQL:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         self._join_parser(join),
                         where_q,
-                        (' GROUP BY ' + self._concat_list(group)) if group else '',
+                        (' GROUP BY ' + self._backtick_columns(group)) if group else '',
                         (' HAVING ' + having) if having else '',
-                        (' ORDER BY ' + self._concat_list(order)) if order else '',
+                        (' ORDER BY ' + self._backtick_columns(order)) if order else '',
                         self._limit_parser(limit), ';'])
 
         if self.debug:
