@@ -297,6 +297,19 @@ class DictMySQL:
                 break
             yield result
 
+    @staticmethod
+    def isstr(s):
+        try:
+            return isinstance(s, basestring)  # Python 2 string
+        except NameError:
+            return isinstance(s, str)  # Python 3 string
+
+    def _by_columns(self, columns):
+        """
+        Allow select.group and select.order accepting string and list
+        """
+        return columns if self.isstr(columns) else self._backtick_columns(columns)
+
     def select(self, table, columns=None, join=None, where=None, group=None, having=None, order=None, limit=None,
                iterator=False, fetch=True):
         """
@@ -324,9 +337,9 @@ class DictMySQL:
                         ' FROM ', self._tablename_parser(table)['formatted_tablename'],
                         self._join_parser(join),
                         where_q,
-                        (' GROUP BY ' + self._backtick_columns(group)) if group else '',
+                        (' GROUP BY ' + self._by_columns(group)) if group else '',
                         (' HAVING ' + having) if having else '',
-                        (' ORDER BY ' + self._backtick_columns(order)) if order else '',
+                        (' ORDER BY ' + self._by_columns(order)) if order else '',
                         self._limit_parser(limit), ';'])
 
         if self.debug:
