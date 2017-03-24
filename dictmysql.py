@@ -12,19 +12,13 @@ cursors = pymysql.cursors
 
 class DictMySQL:
     def __init__(self, host, user, passwd, db=None, port=3306, charset='utf8', init_command='SET NAMES UTF8',
-                 dictcursor=False, cursorclass=cursors.Cursor, use_unicode=True, autocommit=False):
-        """
-        :param dictcursor: Deprecated
-        """
+                 cursorclass=cursors.Cursor, use_unicode=True, autocommit=False):
         self.host = host
         self.port = int(port)
         self.user = user
         self.passwd = passwd
         self.db = db
-        self.dictcursor = dictcursor
         self.cursorclass = cursorclass
-        if self.dictcursor:
-            self.cursorclass = cursors.DictCursor
         self.charset = charset
         self.init_command = init_command
         self.use_unicode = use_unicode
@@ -37,8 +31,6 @@ class DictMySQL:
         self.debug = False
 
     def reconnect(self):
-        if self.dictcursor:
-            self.cursorclass = cursors.DictCursor
         self.connection = self.conn = pymysql.connect(host=self.host, port=self.port, user=self.user,
                                                       passwd=self.passwd, db=self.db, cursorclass=self.cursorclass,
                                                       charset=self.charset, init_command=self.init_command,
