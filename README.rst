@@ -34,6 +34,19 @@ Quick example:
               where={'$OR': [{'value': {'$LIKE': 'Artist%'}}, {'id': 10}]})
     # SELECT `id`, `value` FROM `jobs` WHERE (`value` LIKE "Artist%") OR (`id` = 10);
 
+With DictCursor:
+
+.. code:: python
+
+    from dictmysql import DictMySQL, cursors
+    db = DictMySQL(db='occupation', host='127.0.0.1', user='root', passwd='', 
+                   cursorclass=cursors.DictCursor)
+
+    db.select(table='jobs',
+              columns=['id','value'],
+              limit=2)
+    # returns [{u'id': 1, u'value': u'Artist'}, {u'id': 2, u'value': u'Engineer'}]
+
 License
 -------
 
