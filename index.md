@@ -1,5 +1,4 @@
 ---
-layout: page
 title: DictMySQL
 description: More convenient database manipulation with Python dictionary.
 ---
