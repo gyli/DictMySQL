@@ -423,7 +423,8 @@ class DictMySQL:
 
         _sql = ''.join(['INSERT INTO ', self._backtick(table), ' (', self._backtick_columns(value), ') VALUES ',
                         '(', value_q, ') ',
-                        'ON DUPLICATE KEY UPDATE ', ', '.join(['='.join([k, k]) for k in update_columns]), ';'])
+                        'ON DUPLICATE KEY UPDATE ',
+                        ', '.join(['='.join([k, 'VALUES('+k+')']) for k in update_columns]), ';'])
 
         if self.debug:
             return self.cur.mogrify(_sql, _args)

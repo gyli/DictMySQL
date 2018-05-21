@@ -8,8 +8,8 @@ Documentation: https://git.io/dictmysql
 Introduction
 ------------
 
-A mysql class on the top of
-`PyMySQL <https://github.com/PyMySQL/PyMySQL>`__, for more convenient
+DictMySQL is a MySQL query builder on the top of
+`PyMySQL <https://github.com/PyMySQL/PyMySQL>`__. It allows convenient
 database manipulation with Python dictionary.
 
 DictMySQL simplifies and unifies the input/output of MySQL queries, by
