@@ -314,6 +314,7 @@ class DictMySQL:
         :type having: string
         :type order: string|list
         :type limit: int|list
+        # TODO: change to offset
         :param limit: The max row number for this query.
                       If it contains offset, limit must be a list like [offset, limit]
         :param iterator: Whether to output the result in a generator. It always returns generator if the cursor is
@@ -367,6 +368,8 @@ class DictMySQL:
             if result:
                 yield result
             else:
+                break
+            if self.debug:
                 break
 
     def get(self, table, column, join=None, where=None, insert=False, ifnone=None):

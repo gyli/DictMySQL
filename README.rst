@@ -47,6 +47,13 @@ With DictCursor:
               limit=2)
     # returns [{u'id': 1, u'value': u'Artist'}, {u'id': 2, u'value': u'Engineer'}]
 
+Future Works
+------------
+
+1. Full support of CRUD
+2. Better documents
+
+
 License
 -------
 
