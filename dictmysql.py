@@ -314,7 +314,8 @@ class DictMySQL:
         :type having: string
         :type order: string|list
         :type limit: int|list
-        :param limit: The max row number you want to get from the query.
+        :param limit: The max row number for this query.
+                      If it contains offset, limit must be a list like [offset, limit]
         :param iterator: Whether to output the result in a generator. It always returns generator if the cursor is
                          SSCursor or SSDictCursor, no matter iterator is True or False.
         :type fetch: bool
@@ -349,6 +350,24 @@ class DictMySQL:
             return self._yield_result()
 
         return self.cur.fetchall()
+
+    def select_page(self, limit, order, offset=0, **kwargs):
+        """
+        :type order: string|list
+        :type limit: int
+        :param limit: The max row number for each page
+        :type offset: int
+        :param offset: The starting position of the page
+        :return:
+        """
+        start = offset
+        while True:
+            result = self.select(order=order, limit=[start, limit], **kwargs)
+            start += limit
+            if result:
+                yield result
+            else:
+                break
 
     def get(self, table, column, join=None, where=None, insert=False, ifnone=None):
         """
