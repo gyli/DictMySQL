@@ -352,9 +352,8 @@ class DictMySQL:
 
         return self.cur.fetchall()
 
-    def select_page(self, limit, order, offset=0, **kwargs):
+    def select_page(self, limit, offset=0, **kwargs):
         """
-        :type order: string|list
         :type limit: int
         :param limit: The max row number for each page
         :type offset: int
@@ -363,7 +362,7 @@ class DictMySQL:
         """
         start = offset
         while True:
-            result = self.select(order=order, limit=[start, limit], **kwargs)
+            result = self.select(limit=[start, limit], **kwargs)
             start += limit
             if result:
                 yield result
